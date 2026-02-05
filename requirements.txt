@@ -1,0 +1,38 @@
+# LangGraph RAG Project Requirements
+
+# Core LangChain
+langchain>=0.1.0
+langchain-core>=0.1.0
+langchain-community>=0.0.10
+langchain-openai>=0.0.5
+langchain-text-splitters>=0.0.1
+
+# LangGraph
+langgraph>=0.0.20
+
+# Vector Store
+langchain-chroma>=0.0.1
+chromadb>=0.4.0
+
+# PDF Processing
+pymupdf>=1.23.0
+pypdf>=3.17.0
+
+# Environment
+python-dotenv>=1.0.0
+
+# Pydantic
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Optional: HuggingFace Embeddings
+# langchain-huggingface>=0.0.1
+
+# Optional: Cohere Reranker
+# langchain-cohere>=0.0.1
+
+# Optional: Semantic Chunking
+# langchain-experimental>=0.0.40
+
+# Development
+ipython>=8.0.0

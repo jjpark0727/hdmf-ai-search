@@ -44,7 +44,7 @@ langgraph_rag_project/
 ```bash
 # 가상환경 생성
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows: .\venv\Scripts\activate
 
 # 패키지 설치
 pip install -r requirements.txt
@@ -105,6 +105,8 @@ python main.py visualize graph.png
 
 ## 📊 그래프 워크플로우
 
+자세한 워크플로우는 docs 폴더를 참고하세요 
+
 ```
 START
   │
@@ -152,7 +154,7 @@ START
 ### 노드/엣지 분리
 
 - **node.py**: 상태 관리만 담당
-- **rag/*.py**: 실제 비즈니스 로직 담당
+- **rag/*.py**: 실제 비즈니스 로직 담당 (RAG 검색)
 - 테스트 용이, 재사용 가능
 
 ## 📝 사용 예시
@@ -170,10 +172,9 @@ response = run_chat(
 # 요약 쿼리
 response = run_chat(
     question="1번 문서의 핵심 내용을 요약해줘",
-    thread_id="session_1"
+    thread_id="session_1",
+    uploaded_files=["1", "2"]
 )
 ```
 
-## 📄 라이선스
 
-MIT License

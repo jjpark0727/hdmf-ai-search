@@ -8,8 +8,9 @@ from langchain.tools import tool
 from langchain_core.messages import HumanMessage
 
 from model import summary_model
-from rag.retriever import get_japan_retriever, get_usa_retriever, get_vector_store
-from prompt import SUMMARY_DOC_PROMPT, SUMMARY_TEXT_PROMPT, SUMMARY_PAGE_PROMPT
+from rag.retriever import get_japan_retriever, get_usa_retriever
+from rag.vectorstore import get_vector_store
+from prompt import SUMMARY_DOC_PROMPT, SUMMARY_TEXT_PROMPT, SUMMARY_PAGE_PROMPT, SUMMARY_HISTORY_PROMPT
 
 
 # ============================================
@@ -56,20 +57,13 @@ def retrieve_usa(query: str) -> str:
 # ============================================
 
 @tool("summarize_doc_tool")
-def summarize_doc(file_ids: list[str]) -> str:
+def summarize_doc(file_ids: list[str], 
+                  format_instruction: str = "간결하게 5줄의 불렛포인트") -> str:
     """
     업로드된 특정 문서(들)의 전체 내용을 요약하거나 핵심 정보를 추출할 때 사용합니다.
-
-    [인자 구성 규칙]
-    1. file_ids (List[str]): 요약할 문서의 ID 목록입니다. 반드시 문자열 리스트 형태로 전달해야 합니다. (예: ["1"], ["1", "2"])
-
-    [멀티턴 맥락 참조 규칙]
-    - 사용자가 질문에 특정 ID를 명시했다면 해당 ID를 사용하세요.
-    - 만약 사용자가 ID를 명시하지 않고 "이 문서", "그 파일" 등으로 지칭한다면, 이전 대화 기록(chat_history)을 참조하여 가장 적절한 file_id를 추론하여 입력하세요.
-    - 질문에 구체적인 ID가 없고 맥락상으로도 특정하기 어렵다면, 현재 업로드된 모든 문서의 ID를 리스트에 담으세요.
-
-    [주의사항]
-    - 반드시 '제공된 문서'의 내용에 기반하여 요약을 수행해야 할 때만 이 도구를 호출하세요.
+    유저의 질문에서 요약할 문서의 ID를 추출하여, 'file_ids (List[str])'으로 전달하세요.
+    사용자가 출력 양식을 지정한 경우 'format_instruction' 인자로 전달하세요. 
+    반드시 '제공된 문서'의 내용에 기반하여 요약을 수행해야 할 때만 이 도구를 호출하세요.
     """
     vector_store = get_vector_store()
     all_docs_content = []
@@ -93,7 +87,7 @@ def summarize_doc(file_ids: list[str]) -> str:
         return "요약할 수 있는 문서 내용을 찾지 못했습니다. 파일 ID를 확인해주세요."
 
     # 요약 프롬프트 구성
-    summary_prompt = SUMMARY_DOC_PROMPT.format(full_text=full_text)
+    summary_prompt = SUMMARY_DOC_PROMPT.format(full_text=full_text, format_instruction=format_instruction)
 
     # 요약 모델 호출
     response = summary_model.invoke([HumanMessage(content=summary_prompt)])
@@ -102,13 +96,31 @@ def summarize_doc(file_ids: list[str]) -> str:
 
 
 @tool("summarize_text_tool", description="사용자가 직접 입력한 텍스트 본문을 요약합니다.")
-def summarize_text(input_text: str) -> str:
+def summarize_text(input_text: str, 
+                   format_instruction: str = "간결하게 3줄의 불렛포인트") -> str:
     """
     사용자가 직접 입력하거나 복사하여 붙여넣은 텍스트 본문을 요약합니다.
     유저의 질문에서 요약 대상이 되는 본문 내용을 추출하여 'input_text' 인자로 전달하세요.
+    사용자가 출력 양식을 지정한 경우 'format_instruction' 인자로 전달하세요. 
     """
     # 요약 프롬프트 구성
-    summary_prompt = SUMMARY_TEXT_PROMPT.format(input_text=input_text)
+    summary_prompt = SUMMARY_TEXT_PROMPT.format(input_text=input_text, format_instruction=format_instruction)
+
+    # 요약 모델 호출
+    response = summary_model.invoke([HumanMessage(content=summary_prompt)])
+
+    return response.content
+
+
+@tool("summarize_history_tool", description="직전 대화 내용을 요약합니다.")
+def summarize_history(input_text: str, format_instruction: str = "간결하게 3줄의 불렛포인트") -> str:
+    """
+    직전에 대화한 내용을 요약합니다.
+    직전 대화 내용에서 요약할 본문을 추출하여 'input_text' 인자로 전달하세요.
+    사용자가 출력 양식을 지정한 경우 'format_instruction' 인자로 전달하세요.
+    """
+    # 요약 프롬프트 구성
+    summary_prompt = SUMMARY_HISTORY_PROMPT.format(input_text=input_text, format_instruction=format_instruction)
 
     # 요약 모델 호출
     response = summary_model.invoke([HumanMessage(content=summary_prompt)])
@@ -117,11 +129,11 @@ def summarize_text(input_text: str) -> str:
 
 
 @tool("summarize_page_tool")
-def summarize_page(file_ids: list[str], pages: list[int]) -> str:
+def summarize_page(file_ids: list[str], pages: list[int], format_instruction: str = "간결하게 3~5줄의 불렛포인트") -> str:
     """
     업로드된 문서들 중 특정 페이지의 핵심 내용을 요약합니다.
     사용자의 마지막 질문에서 언급된 'file_ids'와 'pages'(페이지 번호 정수 리스트)를 인자로 전달하세요.
-    [주의] 이전 대화 기록과 상관없이 현재 질문에 명시된 페이지 정보만 사용해야 합니다.
+    사용자가 출력 양식을 지정한 경우 'format_instruction' 인자로 전달하세요.
     """
     vector_store = get_vector_store()
     all_docs_content = []
@@ -152,7 +164,7 @@ def summarize_page(file_ids: list[str], pages: list[int]) -> str:
 
     # 요약 프롬프트 구성
     pages_str = ", ".join(map(str, pages))
-    summary_prompt = SUMMARY_PAGE_PROMPT.format(pages=pages_str, full_text=full_text)
+    summary_prompt = SUMMARY_PAGE_PROMPT.format(pages=pages_str, full_text=full_text, format_instruction=format_instruction)
 
     # 요약 모델 호출
     response = summary_model.invoke([HumanMessage(content=summary_prompt)])
@@ -168,7 +180,7 @@ def summarize_page(file_ids: list[str], pages: list[int]) -> str:
 retrieve_node_tools = [retrieve_japan, retrieve_usa]
 
 # 요약 전용 툴
-summarize_node_tools = [summarize_text, summarize_doc, summarize_page]
+summarize_node_tools = [summarize_text, summarize_doc, summarize_page, summarize_history]
 
 # 모든 도구
 all_tools = retrieve_node_tools + summarize_node_tools

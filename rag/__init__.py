@@ -5,19 +5,48 @@ rag/__init__.py - RAG 모듈 패키지 초기화
 from .parser import DocumentParser
 from .chunker import ChunkingStrategy
 from .embedder import EmbeddingManager
-from .retriever import RetrieverFactory, get_vector_store
+from .vectorstore import (
+    BaseVectorStore,
+    ChromaVectorStore,
+    FAISSVectorStore,
+    VectorStoreFactory,
+    get_vector_store,
+    set_vector_store_type,
+    add_documents_to_vectorstore,
+)
+from .retriever import (
+    RetrieverFactory,
+    get_japan_retriever,
+    get_usa_retriever,
+)
 from .grader import DocumentGrader, GradeResult
 from .query_transform import QueryTransformer
 from .generator import RAGGenerator
 
 __all__ = [
+    # Parser
     "DocumentParser",
-    "ChunkingStrategy", 
+    # Chunker
+    "ChunkingStrategy",
+    # Embedder
     "EmbeddingManager",
-    "RetrieverFactory",
+    # Vectorstore
+    "BaseVectorStore",
+    "ChromaVectorStore",
+    "FAISSVectorStore",
+    "VectorStoreFactory",
     "get_vector_store",
+    "set_vector_store_type",
+    "add_documents_to_vectorstore",
+    # Retriever
+    "RetrieverFactory",
+    "get_japan_retriever",
+    "get_usa_retriever",
+    # Grader
     "DocumentGrader",
     "GradeResult",
+    # Query Transform
     "QueryTransformer",
+    # Generator
     "RAGGenerator",
 ]

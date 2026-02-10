@@ -1,5 +1,7 @@
 """
-rag/chunker.py - 텍스트 청킹 전략
+rag/chunker.py - (2) 텍스트 청킹 전략
+
+실험: recursive_chunk()가 기본
 """
 
 from typing import List, Optional
@@ -13,7 +15,7 @@ from config import CHUNK_SIZE, CHUNK_OVERLAP
 
 
 class ChunkingStrategy:
-    """다양한 청킹 전략 지원"""
+    """다양한 청킹 전략 """
     
     def __init__(
         self, 
@@ -23,6 +25,7 @@ class ChunkingStrategy:
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
     
+    # 기본 재귀 청킹 (사용 함수)
     def recursive_chunk(
         self, 
         documents: List[Document],
@@ -52,6 +55,7 @@ class ChunkingStrategy:
         )
         return splitter.split_documents(documents)
     
+    # 토큰 기반 청킹 (실험용)
     def token_chunk(
         self, 
         documents: List[Document],
@@ -77,6 +81,7 @@ class ChunkingStrategy:
         )
         return splitter.split_documents(documents)
     
+    # 의미 기반 청킹 (실험용)
     def semantic_chunk(
         self, 
         documents: List[Document],
@@ -110,33 +115,34 @@ class ChunkingStrategy:
                 "pip install langchain-experimental 로 설치하세요."
             )
     
-    def chunk_by_strategy(
-        self, 
-        documents: List[Document],
-        strategy: str = "recursive",
-        **kwargs
-    ) -> List[Document]:
-        """
-        전략 이름으로 청킹 실행
+    # Customized 청킹 전략 (실험용)
+    # def chunk_by_strategy(
+    #     self, 
+    #     documents: List[Document],
+    #     strategy: str = "recursive",
+    #     **kwargs
+    # ) -> List[Document]:
+    #     """
+    #     전략 이름으로 청킹 실행
         
-        Args:
-            documents: 분할할 문서 리스트
-            strategy: 청킹 전략 ("recursive", "token", "semantic")
-            **kwargs: 각 전략별 추가 파라미터
+    #     Args:
+    #         documents: 분할할 문서 리스트
+    #         strategy: 청킹 전략 ("recursive", "token", "semantic")
+    #         **kwargs: 각 전략별 추가 파라미터
         
-        Returns:
-            분할된 Document 리스트
-        """
-        strategies = {
-            "recursive": self.recursive_chunk,
-            "token": self.token_chunk,
-            "semantic": self.semantic_chunk,
-        }
+    #     Returns:
+    #         분할된 Document 리스트
+    #     """
+    #     strategies = {
+    #         "recursive": self.recursive_chunk,
+    #         "token": self.token_chunk,
+    #         "semantic": self.semantic_chunk,
+    #     }
         
-        if strategy not in strategies:
-            raise ValueError(f"지원하지 않는 전략입니다: {strategy}. 가능한 값: {list(strategies.keys())}")
+    #     if strategy not in strategies:
+    #         raise ValueError(f"지원하지 않는 전략입니다: {strategy}. 가능한 값: {list(strategies.keys())}")
         
-        return strategies[strategy](documents, **kwargs)
+    #     return strategies[strategy](documents, **kwargs)
 
 
 # 편의 함수
@@ -157,4 +163,4 @@ def chunk_documents(
         분할된 Document 리스트
     """
     chunker = ChunkingStrategy(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-    return chunker.recursive_chunk(documents)
+    return chunker.recursive_chunk(documents)       

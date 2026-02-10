@@ -60,7 +60,7 @@ def analyze_user_intent(state: GraphState):
     sys_msg = SystemMessage(content=DYNAMIC_INSTRUCTION)
     human_msg = HumanMessage(content=DECISION_TEMPLATE.format(question=current_real_question))
 
-    # 최종 메시지 = [지시사항] + 대화 맥락(ToolMessages는 제외) + [원본 질문 => 최종명령]
+    # 최종 메시지 = [지시사항] + 대화 맥락 + [원본 질문]
     messages = [sys_msg] + chat_history[:-1] + [human_msg]
 
     # 모델 호출
@@ -280,8 +280,10 @@ def generate_answer_node(state: GraphState):
     chat_history = state.get("chat_history", [])
     
     # 요약 노드에서 온 경우, 바로 종료
+    # summarize_node에서 이미 chat_history에 요약 결과를 추가했으므로
+    # 여기서는 from_summarize 플래그만 리셋 (chat_history는 유지)
     if state.get("from_summarize", False):
-        return {"chat_history": [], "from_summarize": False}
+        return {"from_summarize": False}
     
     # 질문과 컨텍스트 가져오기
     question = state["original_query"]

@@ -1,3 +1,4 @@
+```mermaid
 flowchart TB
     subgraph ORCHESTRATION["🤖 LangGraph Orchestration"]
         direction TB
@@ -153,3 +154,4 @@ flowchart TB
     class RET,VS,EMB rag
     class GEN_LLM,GEN_PROMPT,SUM_LLM,SUM_PROMPT generation
     class CHAT_MEM,INTERNAL_MEM memory
+    ```

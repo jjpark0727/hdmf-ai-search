@@ -1,5 +1,7 @@
 """
-rag/embedder.py - 임베딩 모델 관리
+rag/embedder.py - (3) 임베딩 모델 관리
+
+실험: 기본은 OpenAI, 비용 절감 시 Huggingface로 교체 
 """
 
 from typing import Optional, Literal
@@ -8,7 +10,7 @@ from langchain_openai import OpenAIEmbeddings
 from config import EMBEDDING_MODEL_NAME
 
 
-EmbeddingProvider = Literal["openai", "huggingface", "cohere"]
+EmbeddingProvider = Literal["openai", "huggingface"]
 
 
 class EmbeddingManager:
@@ -18,9 +20,8 @@ class EmbeddingManager:
     DEFAULT_MODELS = {
         "openai": "text-embedding-3-large",
         "huggingface": "BAAI/bge-m3",
-        "cohere": "embed-multilingual-v3.0",
     }
-    
+    # 기본 사용 (원본)
     @staticmethod
     def get_embeddings(
         provider: EmbeddingProvider = "openai",
@@ -42,8 +43,6 @@ class EmbeddingManager:
             return EmbeddingManager._get_openai_embeddings(model)
         elif provider == "huggingface":
             return EmbeddingManager._get_huggingface_embeddings(model)
-        elif provider == "cohere":
-            return EmbeddingManager._get_cohere_embeddings(model)
         else:
             raise ValueError(f"지원하지 않는 provider입니다: {provider}")
     
@@ -63,30 +62,19 @@ class EmbeddingManager:
                 "HuggingFace 임베딩을 사용하려면 langchain-huggingface 패키지가 필요합니다. "
                 "pip install langchain-huggingface 로 설치하세요."
             )
-    
-    @staticmethod
-    def _get_cohere_embeddings(model_name: str):
-        """Cohere 임베딩 모델 반환"""
-        try:
-            from langchain_cohere import CohereEmbeddings
-            return CohereEmbeddings(model=model_name)
-        except ImportError:
-            raise ImportError(
-                "Cohere 임베딩을 사용하려면 langchain-cohere 패키지가 필요합니다. "
-                "pip install langchain-cohere 로 설치하세요."
-            )
+
 
 
 # 기본 임베딩 인스턴스 (싱글톤 패턴)
 _default_embeddings = None
 
-
+# 사용 함수
 def get_default_embeddings():
     """기본 임베딩 모델 인스턴스 반환 (싱글톤)"""
     global _default_embeddings
     if _default_embeddings is None:
         _default_embeddings = EmbeddingManager.get_embeddings(
-            provider="openai",
+            provider="openai",                       
             model_name=EMBEDDING_MODEL_NAME
         )
     return _default_embeddings

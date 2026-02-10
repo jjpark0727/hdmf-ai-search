@@ -55,28 +55,32 @@ def run_chat(
             if verbose:
                 print(f"\n[Node: {node}]")
             
-            if "messages" in update:
-                for msg in update["messages"]:
+            # 내부 작업 이력 
+            if "internal_history" in update:
+                for msg in update["internal_history"]:
                     # 도구 호출이 있으면 출력
                     if hasattr(msg, "tool_calls") and msg.tool_calls:
                         if verbose:
                             print(f"🛠️ 도구 호출: {msg.tool_calls}")
                     
-                    # 텍스트 답변이 있으면 출력
+                    # 텍스트 답변이 있으면 출력 (없는게 정상)
                     if node == "generate_answer_node":
                         if verbose:
-                            print(f"💬 내용: {msg.content}")
+                            print(f"💬 최종 답변: {msg.content}")
                         final_response = msg.content
+                    # 내부 처리 메시지 내용 출력
                     elif verbose and msg.content:
-                        content_preview = msg.content[:100] + "..." if len(msg.content) > 100 else msg.content
-                        print(f"💬 내용: {content_preview}")
+                        content_preview = msg.content[:200] + "..." if len(msg.content) > 100 else msg.content
+                        print(f"💬 내부 내용(일부): {content_preview}")
             
+            # 최종 대화 이력
             if "chat_history" in update and update["chat_history"]:
                 last_msg = update["chat_history"][-1]
                 if hasattr(last_msg, "content"):
                     final_response = last_msg.content
-                    if verbose and node == "generate_answer_node":
-                        print(f"💬 내용: {last_msg.content}")
+                    # summarize_node와 generate_answer_node 모두 출력
+                    if verbose and node in ["generate_answer_node", "summarize_node"]:
+                        print(f"💬 최종 답변: {last_msg.content}")
             
             if verbose and "needed_search" in update:
                 print(f"🔍 부족한 정보: {update['needed_search']}")
@@ -227,13 +231,13 @@ if __name__ == "__main__":
         command = sys.argv[1]
         
         if command == "interactive":
-            run_interactive()
+            run_interactive()     # 대화형 모드 
         elif command == "test":
-            test_search_query()
-            test_summary_query()
-            test_direct_answer()
+            test_search_query()   # 검색쿼리 테스트
+            test_summary_query()  # 요약쿼리 테스트
+            test_direct_answer()  # 직접대답 테스트
         elif command == "visualize":
-            output_path = sys.argv[2] if len(sys.argv) > 2 else "graph.png"
+            output_path = sys.argv[2] if len(sys.argv) > 2 else "visualize_graph.png"
             visualize_graph(graph, output_path)
         else:
             # 직접 질문 실행

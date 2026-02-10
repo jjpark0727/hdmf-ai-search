@@ -27,6 +27,7 @@ class RAGGenerator:
         """
         self.llm = llm
     
+    # 원본 (검색 답변 모드)
     def generate(
         self,
         question: str,
@@ -50,8 +51,8 @@ class RAGGenerator:
         Returns:
             AIMessage - 생성된 답변
         """
-        instr = instructions or ANSWER_GENERATION_INSTRUCTIONS
-        tmpl = template or ANSWER_GENERATION_TEMPLATE
+        instr = ANSWER_GENERATION_INSTRUCTIONS
+        tmpl = ANSWER_GENERATION_TEMPLATE
         
         # 부족한 국가 정보 안내 메시지 추가
         full_context = context
@@ -79,6 +80,7 @@ class RAGGenerator:
         
         return response
     
+    # 원본 (DIRECT_ANSWER 모드)
     def generate_direct(
         self,
         question: str,
@@ -100,8 +102,8 @@ class RAGGenerator:
         Returns:
             AIMessage - 생성된 답변
         """
-        instr = instructions or DIRECT_ANSWER_GENERATION_INSTRUCTIONS
-        tmpl = template or DIRECT_ANSWER_GENERATION_TEMPLATE
+        instr = DIRECT_ANSWER_GENERATION_INSTRUCTIONS
+        tmpl =DIRECT_ANSWER_GENERATION_TEMPLATE
         
         # 프롬프트 구성
         formatted_prompt = tmpl.format(question=question)
@@ -111,7 +113,7 @@ class RAGGenerator:
         
         # 대화 기록 추가 (있는 경우)
         if chat_history:
-            messages.extend(chat_history[:-1])  # 마지막 질문 제외
+            messages.extend(chat_history[:-1])  # 마지막으로 한 질문은 제외하고 기록 추가 
         
         messages.append(HumanMessage(content=formatted_prompt))
         
@@ -120,6 +122,7 @@ class RAGGenerator:
         
         return response
     
+    # 모드 자동 선택 
     def generate_with_mode(
         self,
         question: str,
@@ -141,6 +144,8 @@ class RAGGenerator:
         Returns:
             AIMessage - 생성된 답변
         """
+
+        # 맥락 (검색된 문서)가 있는 경우
         if context and context.strip():
             # RAG 모드
             return self.generate(
@@ -149,8 +154,9 @@ class RAGGenerator:
                 chat_history=chat_history,
                 missing_countries=missing_countries
             )
+        # DIRECT_ANSWER 인 경우 
         else:
-            # 직접 답변 모드
+          
             return self.generate_direct(
                 question=question,
                 chat_history=chat_history
@@ -163,6 +169,7 @@ class RAGGenerator:
             notices.append(f"(참고: {country.upper()}에 대한 정보는 제공된 문서에 없습니다.)")
         return "\n".join(notices)
     
+    # 인용 포험 답변 (실험용)
     def generate_with_citations(
         self,
         question: str,
@@ -194,10 +201,10 @@ class RAGGenerator:
         # 인용 지시사항 추가
         citation_instructions = ANSWER_GENERATION_INSTRUCTIONS + """
 
-[인용 규칙]
-- 답변에서 특정 정보를 언급할 때 해당 출처 번호를 [1], [2] 형식으로 표기하세요.
-- 여러 출처의 정보를 종합할 경우 [1,2] 형식으로 표기하세요.
-"""
+            [인용 규칙]
+            - 답변에서 특정 정보를 언급할 때 해당 출처 번호를 [1], [2] 형식으로 표기하세요.
+            - 여러 출처의 정보를 종합할 경우 [1,2] 형식으로 표기하세요.
+            """
         
         return self.generate(
             question=question,

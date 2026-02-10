@@ -14,11 +14,11 @@ load_dotenv()
 # ============================================
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# LangSmith (선택적)
-LANGCHAIN_TRACING_V2 = os.getenv("LANGCHAIN_TRACING_V2", "false")
-LANGCHAIN_ENDPOINT = os.getenv("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
-LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT", "LangGraph RAG Project")
-LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
+# # LangSmith (선택적)
+# LANGCHAIN_TRACING_V2 = os.getenv("LANGCHAIN_TRACING_V2", "false")
+# LANGCHAIN_ENDPOINT = os.getenv("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
+# LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT", "LangGraph RAG Project")
+# LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
 
 # ============================================
 # 경로 설정
@@ -61,7 +61,7 @@ CHUNK_OVERLAP = 200
 # 검색 설정
 RETRIEVER_K = 6  # 검색 결과 개수
 
-# 재시도 설정
+# 검색 재시도 설정
 MAX_RETRY_COUNT = 2
 
 # ============================================

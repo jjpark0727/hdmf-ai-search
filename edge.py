@@ -14,31 +14,35 @@ from config import MAX_RETRY_COUNT
 def route_tools(state: GraphState) -> str:
     """
     사용자 의도 분석 결과에 따라 다음 노드 결정
-    
+
     Args:
         state: 현재 그래프 상태
-    
+
     Returns:
         다음 노드 이름 ("retrieve", "summarize", "generate_answer")
     """
-    # 도구 호출이 없는 경우 (답변생성 노드로 바로 가서 답변)
-    if "internal_history" not in state or not state["internal_history"]:
-        return "generate_answer"
-
     last_message = state["internal_history"][-1]
+    print(f"[DEBUG] route_tools: last_message type = {type(last_message)}")                    # 가장 마지막 internal history
+    print(f"[DEBUG] route_tools: hasattr tool_calls = {hasattr(last_message, 'tool_calls')}")  # 툴 호출이 되었는지 여부(T/F)
+    if hasattr(last_message, "tool_calls"):
+        print(f"[DEBUG] route_tools: last_message.tool_calls = {last_message.tool_calls}")     # 호출된 툴 정보 
 
     # 도구 호출이 있는 경우
     if hasattr(last_message, "tool_calls") and last_message.tool_calls:
         tool_name = last_message.tool_calls[0]["name"]
-        
+        print(f"[DEBUG] route_tools: tool_name = {tool_name}")
+
         # 요약 도구인 경우
         if "summarize" in tool_name:
+            print(f"[DEBUG] route_tools: 요약 도구 → summarize")
             return "summarize"
-        
+
         # 검색 도구인 경우
+        print(f"[DEBUG] route_tools: 검색 도구 → retrieve")
         return "retrieve"
-    
+
     # 도구 호출이 없으면 직접 답변
+    print("[DEBUG] route_tools: tool_calls 없음 → generate_answer")
     return "generate_answer"
 
 

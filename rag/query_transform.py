@@ -22,6 +22,7 @@ class QueryTransformer:
         """
         self.llm = llm
     
+    # 원본 
     def rewrite_for_missing_info(
         self,
         question: str,
@@ -61,6 +62,7 @@ class QueryTransformer:
         
         return response.content
     
+    # 멀티쿼리 (실험용)
     def multi_query(
         self,
         question: str,
@@ -77,19 +79,20 @@ class QueryTransformer:
             변환된 쿼리 리스트
         """
         prompt = f"""당신은 검색 쿼리 전문가입니다.
-다음 질문을 {num_queries}개의 서로 다른 관점에서 재작성해주세요.
-각 쿼리는 원본 질문의 의도를 유지하면서 다른 키워드나 표현을 사용해야 합니다.
+                다음 질문을 {num_queries}개의 서로 다른 관점에서 재작성해주세요.
+                각 쿼리는 원본 질문의 의도를 유지하면서 다른 키워드나 표현을 사용해야 합니다.
 
-원본 질문: {question}
+                원본 질문: {question}
 
-각 쿼리를 줄바꿈으로 구분하여 출력하세요. 번호나 부연설명 없이 쿼리만 출력하세요.
-"""
+                각 쿼리를 줄바꿈으로 구분하여 출력하세요. 번호나 부연설명 없이 쿼리만 출력하세요.
+                """
         
         response = self.llm.invoke([HumanMessage(content=prompt)])
         queries = [q.strip() for q in response.content.strip().split("\n") if q.strip()]
         
         return queries[:num_queries]
     
+    # HYDE 전략 (실험용)
     def hyde(
         self,
         question: str
@@ -106,15 +109,16 @@ class QueryTransformer:
             가상의 답변 문서
         """
         prompt = f"""다음 질문에 대한 상세하고 전문적인 답변을 작성해주세요.
-실제 데이터가 아니어도 괜찮으니, 해당 주제에 대해 있을 법한 내용으로 작성해주세요.
+            실제 데이터가 아니어도 괜찮으니, 해당 주제에 대해 있을 법한 내용으로 작성해주세요.
 
-질문: {question}
+            질문: {question}
 
-답변:"""
+            답변:"""
         
         response = self.llm.invoke([HumanMessage(content=prompt)])
         return response.content
     
+    # STEP BACK 전략 (실험용)
     def step_back(
         self,
         question: str
@@ -131,15 +135,17 @@ class QueryTransformer:
             더 일반적인 형태의 질문
         """
         prompt = f"""다음 질문을 한 단계 뒤로 물러나서 더 일반적이고 근본적인 질문으로 변환해주세요.
-구체적인 사례나 특정 상황 대신, 해당 주제의 핵심 개념이나 원리를 묻는 질문으로 바꿔주세요.
+            구체적인 사례나 특정 상황 대신, 해당 주제의 핵심 개념이나 원리를 묻는 질문으로 바꿔주세요.
 
-원본 질문: {question}
+            원본 질문: {question}
 
-변환된 질문 (부연설명 없이 질문만):"""
+            변환된 질문 (부연설명 없이 질문만):"""
         
         response = self.llm.invoke([HumanMessage(content=prompt)])
         return response.content.strip()
     
+
+    # 질문 분해 (실험용)
     def decompose(
         self,
         question: str,
@@ -158,18 +164,19 @@ class QueryTransformer:
             하위 질문 리스트
         """
         prompt = f"""다음 질문을 답변하기 위해 필요한 하위 질문들로 분해해주세요.
-각 하위 질문은 독립적으로 검색하여 답을 찾을 수 있어야 합니다.
-최대 {max_subquestions}개의 하위 질문만 생성하세요.
+            각 하위 질문은 독립적으로 검색하여 답을 찾을 수 있어야 합니다.
+            최대 {max_subquestions}개의 하위 질문만 생성하세요.
 
-원본 질문: {question}
+            원본 질문: {question}
 
-하위 질문들 (각 질문을 줄바꿈으로 구분, 번호 없이):"""
+            하위 질문들 (각 질문을 줄바꿈으로 구분, 번호 없이):"""
         
         response = self.llm.invoke([HumanMessage(content=prompt)])
         subquestions = [q.strip() for q in response.content.strip().split("\n") if q.strip()]
         
         return subquestions[:max_subquestions]
     
+    # 동의어 확장 (실험용)
     def expand_with_synonyms(
         self,
         question: str

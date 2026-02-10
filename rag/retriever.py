@@ -1,65 +1,41 @@
 """
-rag/retriever.py - 벡터스토어 및 검색기 관리
+rag/retriever.py - 검색기(Retriever) 관리
+
+벡터스토어를 활용한 다양한 검색 전략 제공
+벡터스토어는 vectorstore.py에서 관리
 """
 
 from typing import List, Optional, Dict, Any
-from pathlib import Path
 from langchain_core.documents import Document
-from langchain_chroma import Chroma
 
-from config import (
-    VECTORSTORE_DIR,
-    VECTORSTORE_COLLECTION_NAME,
-    RETRIEVER_K,
+from config import RETRIEVER_K
+from .vectorstore import (
+    get_vector_store,
+    add_documents_to_vectorstore,
+    BaseVectorStore,
+    VectorStoreFactory,
+    set_vector_store_type,
 )
-from .embedder import get_default_embeddings
-
-
-# 글로벌 벡터스토어 인스턴스
-_vector_store = None
-
-
-def get_vector_store(
-    collection_name: str = VECTORSTORE_COLLECTION_NAME,
-    persist_directory: Optional[str] = None,
-    embeddings=None
-) -> Chroma:
-    """
-    벡터스토어 인스턴스 반환 (싱글톤)
-    
-    Args:
-        collection_name: 컬렉션 이름
-        persist_directory: 저장 경로 (None이면 config에서 설정)
-        embeddings: 임베딩 모델 (None이면 기본값 사용)
-    
-    Returns:
-        Chroma 벡터스토어 인스턴스
-    """
-    global _vector_store
-    
-    if _vector_store is None:
-        persist_dir = persist_directory or str(VECTORSTORE_DIR)
-        emb = embeddings or get_default_embeddings()
-        
-        _vector_store = Chroma(
-            collection_name=collection_name,
-            embedding_function=emb,
-            persist_directory=persist_dir,
-        )
-    
-    return _vector_store
 
 
 class RetrieverFactory:
     """다양한 검색 전략 지원"""
     
-    def __init__(self, vector_store: Optional[Chroma] = None):
+    def __init__(self, vector_store: Optional[BaseVectorStore] = None):
         """
         Args:
             vector_store: 벡터스토어 인스턴스 (None이면 기본값 사용)
         """
-        self.vector_store = vector_store or get_vector_store()
+        self._vector_store = vector_store
     
+    @property
+    def vector_store(self) -> BaseVectorStore:
+        """벡터스토어 인스턴스 (지연 로딩)"""
+        if self._vector_store is None:
+            self._vector_store = get_vector_store()
+        return self._vector_store
+    
+    # 원본 (검색용)
     def get_similarity_retriever(
         self,
         k: int = RETRIEVER_K,
@@ -84,6 +60,7 @@ class RetrieverFactory:
             search_kwargs=search_kwargs
         )
     
+    # 원본 (요약)
     def get_mmr_retriever(
         self,
         k: int = RETRIEVER_K,
@@ -118,6 +95,7 @@ class RetrieverFactory:
             search_kwargs=search_kwargs
         )
     
+    # 국가별 필터
     def get_country_retriever(
         self,
         country: str,
@@ -141,6 +119,51 @@ class RetrieverFactory:
             return self.get_mmr_retriever(k=k, filter=filter)
         return self.get_similarity_retriever(k=k, filter=filter)
     
+    # 의미 + 키워드 결합 하이브리드 검색 (실험용)
+    def get_hybrid_retriever(
+        self,
+        documents: List[Document],
+        k: int = RETRIEVER_K,
+        bm25_weight: float = 0.4,
+        dense_weight: float = 0.6
+    ):
+        """
+        하이브리드 검색 retriever (Dense + Sparse)
+        
+        BM25 (키워드 기반) + Dense (의미 기반) 검색 결합
+        
+        Args:
+            documents: BM25 인덱싱용 문서 리스트
+            k: 반환할 문서 수
+            bm25_weight: BM25 가중치
+            dense_weight: Dense 검색 가중치
+        
+        Returns:
+            EnsembleRetriever
+        """
+        try:
+            from langchain.retrievers import EnsembleRetriever
+            from langchain_community.retrievers import BM25Retriever
+        except ImportError:
+            raise ImportError(
+                "하이브리드 검색을 사용하려면 rank_bm25 패키지가 필요합니다. "
+                "pip install rank_bm25 로 설치하세요."
+            )
+        
+        # BM25 Retriever
+        bm25_retriever = BM25Retriever.from_documents(documents, k=k)
+        
+        # Dense Retriever
+        dense_retriever = self.get_similarity_retriever(k=k)
+        
+        # Ensemble
+        return EnsembleRetriever(
+            retrievers=[bm25_retriever, dense_retriever],
+            weights=[bm25_weight, dense_weight]
+        )
+    
+
+    # 유사한 문서 리스트 
     def search(
         self,
         query: str,
@@ -158,12 +181,9 @@ class RetrieverFactory:
         Returns:
             Document 리스트
         """
-        search_kwargs = {"k": k}
-        if filter:
-            search_kwargs["filter"] = filter
-        
-        return self.vector_store.similarity_search(query, **search_kwargs)
+        return self.vector_store.similarity_search(query, k=k, filter=filter)
     
+    # 요약용 문서 검색
     def mmr_search(
         self,
         query: str,
@@ -191,7 +211,10 @@ class RetrieverFactory:
         )
 
 
-# 편의 함수
+# ============================================
+# 편의 함수 (하위 호환성 유지)
+# ============================================
+
 def get_japan_retriever(k: int = RETRIEVER_K):
     """일본 문서 전용 retriever 반환"""
     factory = RetrieverFactory()
@@ -204,19 +227,18 @@ def get_usa_retriever(k: int = RETRIEVER_K):
     return factory.get_country_retriever("usa", k=k)
 
 
-def add_documents_to_vectorstore(
-    documents: List[Document],
-    vector_store: Optional[Chroma] = None
-) -> List[str]:
-    """
-    벡터스토어에 문서 추가
-    
-    Args:
-        documents: 추가할 문서 리스트
-        vector_store: 벡터스토어 인스턴스 (None이면 기본값 사용)
-    
-    Returns:
-        추가된 문서 ID 리스트
-    """
-    vs = vector_store or get_vector_store()
-    return vs.add_documents(documents=documents)
+# ============================================
+# Re-export (하위 호환성)
+# ============================================
+# vectorstore.py의 함수들을 retriever.py에서도 접근 가능하도록 re-export
+__all__ = [
+    # Retriever 관련
+    "RetrieverFactory",
+    "get_japan_retriever",
+    "get_usa_retriever",
+    # Vectorstore 관련 (re-export)
+    "get_vector_store",
+    "add_documents_to_vectorstore",
+    "set_vector_store_type",
+    "VectorStoreFactory",
+]

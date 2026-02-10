@@ -30,6 +30,7 @@ class DocumentGrader:
         self.llm = llm
         self.structured_llm = llm.with_structured_output(GradeResult)
     
+    # 원본 
     def grade(
         self,
         question: str,
@@ -66,6 +67,8 @@ class DocumentGrader:
         
         return result
     
+
+    # 단일 국가만 평가 (optional)
     def grade_single_country(
         self,
         question: str,
@@ -92,6 +95,7 @@ class DocumentGrader:
         else:
             raise ValueError(f"지원하지 않는 국가입니다: {country}")
     
+    # 부족한 국가 리스트 반환
     def get_needed_countries(
         self,
         question: str,

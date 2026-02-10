@@ -5,7 +5,7 @@ utils.py - 유틸리티 함수
 from typing import List
 from langchain_core.messages import ToolMessage, HumanMessage
 
-
+# 원본
 def get_combined_context(messages: List) -> str:
     """
     메시지 히스토리에서 Tool 결과를 결합하여 컨텍스트 생성
@@ -36,6 +36,11 @@ def get_combined_context(messages: List) -> str:
     return "\n\n".join(reversed(context_blocks))
 
 
+# ============================================
+# 보조 함수: optional
+# ============================================
+
+# 국가별 결과 추출 
 def extract_tool_results_by_country(
     messages: List,
     country: str
@@ -58,7 +63,7 @@ def extract_tool_results_by_country(
     
     return ""
 
-
+# 최신 툴 결과 
 def get_latest_tool_result(messages: List, tool_name_contains: str) -> str:
     """
     특정 이름을 포함하는 가장 최근 Tool 결과 반환
@@ -78,7 +83,7 @@ def get_latest_tool_result(messages: List, tool_name_contains: str) -> str:
     
     return ""
 
-
+# 디버깅용
 def format_chat_history_for_display(messages: List, max_messages: int = 10) -> str:
     """
     대화 기록을 읽기 쉬운 형식으로 포맷팅
@@ -117,7 +122,7 @@ def count_tokens_estimate(text: str) -> int:
     # 간단한 추정: 평균적으로 3자당 1토큰
     return len(text) // 3
 
-
+# 컨텍스트 길이제한 
 def truncate_context(context: str, max_tokens: int = 4000) -> str:
     """
     컨텍스트를 최대 토큰 수에 맞게 자르기

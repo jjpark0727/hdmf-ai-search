@@ -1,5 +1,8 @@
 """
-rag/parser.py - 문서 로딩 및 메타데이터 주입
+rag/parser.py - (1) 문서 로딩 및 메타데이터 주입
+
+실험: 기본 load() 또는 load_pdf_with_metadata() 사용
+
 """
 
 from typing import List, Dict, Optional
@@ -12,13 +15,14 @@ class DocumentParser:
     """다양한 형식의 문서 로딩 및 메타데이터 주입"""
     
     SUPPORTED_LOADERS = {
-        ".pdf": PyMuPDFLoader,
-        ".docx": Docx2txtLoader,
+        ".pdf": PyMuPDFLoader,             
+        ".docx": Docx2txtLoader,        
     }
     
     def __init__(self):
         pass
     
+    # 원본 
     def load(
         self, 
         file_path: str, 
@@ -59,7 +63,7 @@ class DocumentParser:
         return documents
     
 
-    # 여러 파일을 한번에 로딩 
+    # 여러 파일을 한번에 로딩 (실험용)
     def load_multiple(
         self, 
         file_configs: List[Dict],
@@ -103,7 +107,7 @@ class DocumentParser:
         return documents
 
 
-# 원본 코드 ()
+# 사용 함수
 def load_pdf_with_metadata(
     file_path: str,
     country: str,

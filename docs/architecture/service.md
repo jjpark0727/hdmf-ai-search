@@ -1,3 +1,4 @@
+```mermaid
 flowchart TB
     subgraph USER["👤 사용자"]
         U[보험 담당자 / 분석가]
@@ -103,3 +104,4 @@ flowchart TB
     class EMB preprocess
     class CS1,CS2,CS3,IS1,IS2,IS3,SS1,SS2,SS3,SS4,AS1,AS2,AS3 service
     class DB1,DB2,DB3,CHAT_DB data
+    ```

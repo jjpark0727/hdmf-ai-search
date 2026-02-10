@@ -1,3 +1,4 @@
+```mermaid
 flowchart TD
     subgraph START
         S[__start__]
@@ -138,3 +139,4 @@ flowchart TD
     class A,SUM,R,G,RW,RT,GEN process
     class A_INPUT,SUM_INPUT,R_INPUT,G_INPUT,RW_INPUT,RT_INPUT,GEN_INPUT inputState
     class A_STATE,SUM_STATE,R_STATE,G_STATE,RW_STATE,RT_STATE,GEN_STATE outputState
+```

@@ -1,3 +1,4 @@
+```mermaid
 flowchart TB
     subgraph CLIENT["🖥️ Frontend (Client)"]
         subgraph WEB_APP["Web Application"]
@@ -152,3 +153,4 @@ flowchart TB
     class OPENAI,ANTHROPIC,AZURE llm
     class FAISS,CHROMA,PINECONE,POSTGRES,REDIS data
     class DOCKER,K8S,PROMETHEUS,ELK,LANGSMITH infra
+```

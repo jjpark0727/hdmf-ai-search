@@ -40,30 +40,30 @@ def get_combined_context(messages: List) -> str:
 # 보조 함수: optional
 # ============================================
 
-# 국가별 결과 추출 
-def extract_tool_results_by_country(
+# tool_call_id 기반 결과 추출
+def extract_tool_result_by_call_id(
     messages: List,
-    country: str
+    tool_call_id: str
 ) -> str:
     """
-    특정 국가의 Tool 결과만 추출
-    
+    특정 tool_call_id의 Tool 결과를 추출
+
     Args:
         messages: 메시지 리스트
-        country: 국가 코드 ("japan" 또는 "usa")
-    
+        tool_call_id: tool call ID
+
     Returns:
-        해당 국가의 Tool 결과 문자열
+        해당 Tool 결과 문자열
     """
     for msg in reversed(messages):
         if isinstance(msg, HumanMessage):
             break
-        if isinstance(msg, ToolMessage) and country in msg.name:
+        if isinstance(msg, ToolMessage) and msg.tool_call_id == tool_call_id:
             return msg.content
-    
+
     return ""
 
-# 최신 툴 결과 
+# 최신 툴 결과
 def get_latest_tool_result(messages: List, tool_name_contains: str) -> str:
     """
     특정 이름을 포함하는 가장 최근 Tool 결과 반환

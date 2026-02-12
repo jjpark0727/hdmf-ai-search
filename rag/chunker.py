@@ -27,7 +27,7 @@ class ChunkingStrategy:
     
     # 기본 재귀 청킹 (사용 함수)
     def recursive_chunk(
-        self, 
+        self,
         documents: List[Document],
         chunk_size: Optional[int] = None,
         chunk_overlap: Optional[int] = None,
@@ -35,15 +35,16 @@ class ChunkingStrategy:
     ) -> List[Document]:
         """
         기본 재귀 청킹 (Recursive Character Text Splitter)
-        
+
         문단, 문장, 단어 순으로 재귀적으로 분할하여 의미 단위 유지
-        
+        chunk_index 메타데이터를 자동 부여 (페이지 내 청크 순서)
+
         Args:
             documents: 분할할 문서 리스트
             chunk_size: 청크 크기 (기본값: config에서 설정)
             chunk_overlap: 청크 오버랩 (기본값: config에서 설정)
             add_start_index: 시작 인덱스 메타데이터 추가 여부
-        
+
         Returns:
             분할된 Document 리스트
         """
@@ -53,7 +54,19 @@ class ChunkingStrategy:
             add_start_index=add_start_index,
             separators=["\n\n", "\n", ".", " ", ""]
         )
-        return splitter.split_documents(documents)
+        chunks = splitter.split_documents(documents)
+
+        # chunk_index 자동 부여 (file_id + page 기준으로 순서 매김)
+        page_counters: dict = {}
+        for chunk in chunks:
+            file_id = chunk.metadata.get("file_id", "")
+            page = chunk.metadata.get("page", 0)
+            key = f"{file_id}_{page}"
+            idx = page_counters.get(key, 0)
+            chunk.metadata["chunk_index"] = idx
+            page_counters[key] = idx + 1
+
+        return chunks
     
     # 토큰 기반 청킹 (실험용)
     def token_chunk(

@@ -14,11 +14,11 @@ load_dotenv()
 # ============================================
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# # LangSmith (선택적)
-# LANGCHAIN_TRACING_V2 = os.getenv("LANGCHAIN_TRACING_V2", "false")
-# LANGCHAIN_ENDPOINT = os.getenv("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
-# LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT", "LangGraph RAG Project")
-# LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
+# LangSmith
+LANGCHAIN_TRACING_V2 = os.getenv("LANGCHAIN_TRACING_V2")
+LANGCHAIN_ENDPOINT = os.getenv("LANGCHAIN_ENDPOINT")
+LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT")
+LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
 
 # ============================================
 # 경로 설정
@@ -31,11 +31,8 @@ DATA_DIR = PROJECT_ROOT / "data"
 PDF_DIR = DATA_DIR / "pdfs"
 VECTORSTORE_DIR = DATA_DIR / "vectorstore"
 
-# PDF 파일 경로
-PDF_FILES = {
-    "japan": PDF_DIR / "ict_japan_2024.pdf",
-    "usa": PDF_DIR / "ict_usa_2024.pdf",
-}
+# PDF 파일 경로 (업로드된 파일 리스트로 동적 관리)
+PDF_FILES = []
 
 # ============================================
 # 벡터스토어 설정

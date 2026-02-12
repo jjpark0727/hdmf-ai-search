@@ -7,7 +7,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from state import GraphState
 from node import (
-    analyze_user_intent,
+    analyze_user_intent_node,
     retrieve_node,
     summarize_node,
     grade_documents_node,
@@ -34,7 +34,7 @@ def build_graph(use_memory: bool = True) -> StateGraph:
     # ============================================
     # 노드 정의
     # ============================================
-    workflow.add_node("analyze_user_intent_node", analyze_user_intent)
+    workflow.add_node("analyze_user_intent_node", analyze_user_intent_node)
     workflow.add_node("retrieve_node", retrieve_node)
     workflow.add_node("summarize_node", summarize_node)
     workflow.add_node("grade_documents_node", grade_documents_node)

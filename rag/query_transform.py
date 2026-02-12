@@ -22,44 +22,43 @@ class QueryTransformer:
         """
         self.llm = llm
     
-    # 원본 
     def rewrite_for_missing_info(
         self,
         question: str,
-        target_countries: List[str],
+        target_filters: list,
         instructions: Optional[str] = None,
         template: Optional[str] = None
     ) -> str:
         """
-        부족한 국가 정보 보완을 위한 쿼리 재작성
-        
+        부족한 정보 보완을 위한 쿼리 재작성
+
         Args:
             question: 원본 질문
-            target_countries: 재검색이 필요한 국가 리스트 (예: ["usa", "japan"])
+            target_filters: 재검색 대상 메타데이터 필터 리스트 (예: [{"file_id": "1"}])
             instructions: 커스텀 지시사항 (None이면 기본값 사용)
             template: 커스텀 템플릿 (None이면 기본값 사용)
-        
+
         Returns:
             재작성된 검색 쿼리
         """
         instr = instructions or REWRITE_INSTRUCTIONS
         tmpl = template or REWRITE_TEMPLATE
-        
-        # 국가 리스트를 문자열로 변환
-        countries_str = ", ".join(target_countries)
-        
+
+        # 필터 리스트를 문자열로 변환
+        filters_str = str(target_filters)
+
         # 템플릿에 데이터 주입
         formatted_content = tmpl.format(
-            target_countries=countries_str,
+            target_filters=filters_str,
             question=question
         )
-        
+
         # 모델 호출
         response = self.llm.invoke([
             SystemMessage(content=instr),
             HumanMessage(content=formatted_content)
         ])
-        
+
         return response.content
     
     # 멀티쿼리 (실험용)

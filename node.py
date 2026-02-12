@@ -20,7 +20,6 @@ from tool import (
     retrieve_node_tools,
     summarize_node_tools,
 )
-from utils import get_combined_context
 from rag.grader import DocumentGrader
 from rag.query_transform import QueryTransformer
 from rag.generator import RAGGenerator
@@ -37,16 +36,13 @@ rag_generator = RAGGenerator(llm=response_model)
 # ============================================
 # 노드 1: 사용자 의도 분석
 # ============================================
-def analyze_user_intent(state: GraphState):
+def analyze_user_intent_node(state: GraphState):
     """
     사용자 질문의 의도를 분석하여 도구 호출 또는 직접 응답 결정
-    
-    Returns:
-        업데이트된 상태 (internal_history, original_query, retry_counts 등)
-    """
-    # 항상 매 대화턴마다 호출되고 초기화됨
-    initial_retry_counts = {"usa": 0, "japan": 0}
 
+    Returns:
+        업데이트된 상태 (internal_history, original_query, retry_count 등)
+    """
     # 순수 대화 기록
     chat_history = state.get("chat_history", [])
 
@@ -77,7 +73,7 @@ def analyze_user_intent(state: GraphState):
     return {
         "internal_history": [response],
         "original_query": current_real_question,
-        "retry_counts": initial_retry_counts,
+        "retry_count": 0,
         "final_context": "",
         "needed_search": [],
         "from_summarize": False
@@ -93,7 +89,7 @@ standard_tool_node = ToolNode(retrieve_node_tools)
 def retrieve_node(state: GraphState):
     """
     검색 도구 실행 노드
-    
+
     ToolNode가 internal_history의 tool_calls를 실행
     """
     result = standard_tool_node.invoke({
@@ -112,15 +108,16 @@ standard_summarize_tool_node = ToolNode(summarize_node_tools)
 def summarize_node(state: GraphState):
     """
     요약 도구 실행 노드
-    
+
     요약 결과를 chat_history에도 추가하여 대화 맥락 유지
     """
     result = standard_summarize_tool_node.invoke({
         "messages": state["internal_history"]
     })
 
-    # 도구 결과(요약문) 추출
-    summary_text = result["messages"][-1].content
+    # 도구 결과(요약문) 추출 - 복수 tool_calls인 경우 모든 결과를 합산
+    tool_messages = [msg for msg in result["messages"] if isinstance(msg, ToolMessage)]
+    summary_text = "\n\n---\n\n".join(msg.content for msg in tool_messages)
 
     return {
         "internal_history": result["messages"],
@@ -130,74 +127,75 @@ def summarize_node(state: GraphState):
 
 
 # ============================================
-# 노드 4: 문서 관련도 평가 (상태 관리만)
+# 노드 4: 문서 관련도 평가 (개별 tool_call 평가)
 # ============================================
 def grade_documents_node(state: GraphState):
     """
     검색된 문서의 관련성 평가 노드
-    
-    실제 평가 로직은 DocumentGrader에 위임하고,
-    이 노드는 상태 업데이트만 담당
+
+    각 tool_call 결과를 개별적으로 평가하여,
+    통과한 결과는 final_context에 보존하고,
+    실패한 결과의 메타데이터 필터를 needed_search에 추가
     """
     internal_history = state.get("internal_history", [])
-    
-    # 모든 도구 결과 호출해서 합침
-    current_full_context = get_combined_context(internal_history)
-    
-    # 원본 질문
     original_question = state["original_query"]
-    
-    # DocumentGrader에 평가 위임
-    grade_result = document_grader.grade(
-        question=original_question,
-        context=current_full_context
-    )
-    
-    # 결과 채점
+    retry_count = state.get("retry_count", 0)
+
+    # AIMessage에서 tool_calls 정보 추출 (filter_metadata 매핑용)
+    tool_call_filters = {}
+    for msg in internal_history:
+        if isinstance(msg, AIMessage) and hasattr(msg, "tool_calls") and msg.tool_calls:
+            for tc in msg.tool_calls:
+                if tc["name"] == "search_doc_tool":
+                    tool_call_filters[tc["id"]] = tc["args"].get("filter_metadata")
+
+    # 최근 ToolMessage들 수집 (가장 최근 HumanMessage 이전까지)
+    tool_messages = []
+    for msg in reversed(internal_history):
+        if isinstance(msg, HumanMessage):
+            break
+        if isinstance(msg, ToolMessage) and msg.name == "search_doc_tool":
+            tool_messages.append(msg)
+    tool_messages.reverse()
+
+    # 각 ToolMessage를 개별 평가
     needed = []
     validated_blocks = []
-    
-    # 기존 retry_count 가져오기 (없으면 초기화)
-    retry_counts = state.get("retry_counts", {"usa": 0, "japan": 0})
-    
-    # USA 평가
-    if grade_result.usa == "no":
-        needed.append("usa")
-        retry_counts["usa"] += 1
+
+    for tool_msg in tool_messages:
+        grade_result = document_grader.grade(
+            question=original_question,
+            context=tool_msg.content
+        )
+
+        if grade_result.relevant == "yes":
+            validated_blocks.append(tool_msg.content)
+        else:
+            # 실패한 검색의 filter_metadata를 needed_search에 추가
+            failed_filter = tool_call_filters.get(tool_msg.tool_call_id)
+            needed.append(failed_filter if failed_filter else {})
+
+    # final_context: 기존 보존분 + 이번에 통과한 결과
+    existing_context = state.get("final_context", "")
+    new_validated = "\n\n".join(validated_blocks)
+    if existing_context and new_validated:
+        new_final_context = existing_context + "\n\n" + new_validated
+    elif new_validated:
+        new_final_context = new_validated
     else:
-        # 성공시 해당 툴의 내용만 추출해서 보관
-        for msg in reversed(internal_history):
-            if isinstance(msg, HumanMessage):
-                break
-            if isinstance(msg, ToolMessage) and "usa" in msg.name:
-                validated_blocks.append(msg.content)
-                break
-    
-    # JAPAN 평가
-    if grade_result.japan == "no":
-        needed.append("japan")
-        retry_counts["japan"] += 1
-    else:
-        # 성공시 해당 툴의 내용만 추출해서 보관
-        for msg in reversed(internal_history):
-            if isinstance(msg, HumanMessage):
-                break
-            if isinstance(msg, ToolMessage) and "japan" in msg.name:
-                validated_blocks.append(msg.content)
-                break
-    
-    new_final_context = state.get("final_context", "") + "\n\n" + "\n\n".join(validated_blocks)
-    
-    # 어떤 국가라도 2번 이상 실패할 경우 로그
-    for country in needed:
-        if retry_counts.get(country, 0) >= 2:
-            num = retry_counts.get(country, 0)
-            print(f"---[LOG] {country} 정보 검색 {num}회 실패. 답변 생성으로 이동합니다")
-    
+        new_final_context = existing_context
+
+    # retry_count: 관련도 부족(needed)일 때만 증가
+    new_retry_count = retry_count + 1 if needed else retry_count
+
+    # 로그
+    if needed and new_retry_count >= 2:
+        print(f"---[LOG] 재검색 {new_retry_count}회 평가 완료. 답변 생성으로 이동합니다")
+
     return {
         "needed_search": needed,
         "final_context": new_final_context.strip(),
-        "retry_counts": retry_counts
+        "retry_count": new_retry_count
     }
 
 
@@ -206,24 +204,20 @@ def grade_documents_node(state: GraphState):
 # ============================================
 def rewrite_question_node(state: GraphState):
     """
-    부족한 국가 정보를 위한 쿼리 재작성 노드
-    
+    부족한 정보를 위한 쿼리 재작성 노드
+
     실제 재작성 로직은 QueryTransformer에 위임하고,
     이 노드는 상태 업데이트만 담당
     """
-    # 원본 질문
     original_question = state["original_query"]
-    
-    # 재검색이 필요한 국가 리스트
-    needed_countries = state["needed_search"]
-    
+    needed_filters = state["needed_search"]
+
     # QueryTransformer에 재작성 위임
     rewritten_query = query_transformer.rewrite_for_missing_info(
         question=original_question,
-        target_countries=needed_countries
+        target_filters=needed_filters
     )
-    
-    # 새로운 HumanMessage (재작성된 질문) 반환
+
     return {"internal_history": [HumanMessage(content=rewritten_query)]}
 
 
@@ -235,35 +229,35 @@ def retry_retrieve_node(state: GraphState):
     재작성된 질문으로 재검색 도구 호출 생성
     """
     internal_history = state.get("internal_history", [])
-    
+
     # 재작성된 질문
     rewritten_question = internal_history[-1].content
-    
-    # 재검색이 필요한 리스트
+
+    # 재검색이 필요한 메타데이터 필터 리스트
     needed = state.get("needed_search", [])
-    
+
     # 재검색 지시사항
     sys_msg = SystemMessage(content=RETRY_INSTRUCTIONS)
-    
+
     # 히스토리 (재작성 질문 제외)
     history = internal_history[:-1]
-    
+
     # 재검색 타겟
     human_msg = HumanMessage(content=RETRY_TEMPLATE.format(
         needed=needed,
         question=rewritten_question
     ))
-    
+
     # 최종 메시지 = [지시사항] + [대화맥락] + [needed 정보 + 재작성 질문]
     messages = [sys_msg] + history + [human_msg]
-    
+
     # 모델 호출
     response = (
         decision_model
         .bind_tools(retrieve_node_tools)
         .invoke(messages)
     )
-    
+
     return {"internal_history": [response]}
 
 
@@ -273,36 +267,25 @@ def retry_retrieve_node(state: GraphState):
 def generate_answer_node(state: GraphState):
     """
     최종 답변 생성 노드
-    
+
     실제 생성 로직은 RAGGenerator에 위임하고,
     이 노드는 상태 업데이트만 담당
     """
     chat_history = state.get("chat_history", [])
-    
+
     # 요약 노드에서 온 경우, 바로 종료
-    # summarize_node에서 이미 chat_history에 요약 결과를 추가했으므로
-    # 여기서는 from_summarize 플래그만 리셋 (chat_history는 유지)
     if state.get("from_summarize", False):
         return {"from_summarize": False}
-    
+
     # 질문과 컨텍스트 가져오기
     question = state["original_query"]
     context = state.get("final_context", "")
-    needed = state.get("needed_search", [])
-    retry_counts = state.get("retry_counts", {})
-    
-    # 정보가 부족한 국가 리스트 (2회 이상 실패한 국가)
-    missing_countries = [
-        country for country in needed
-        if retry_counts.get(country, 0) >= 2
-    ]
-    
+
     # RAGGenerator에 답변 생성 위임
     response = rag_generator.generate_with_mode(
         question=question,
         context=context if context else None,
-        chat_history=chat_history,
-        missing_countries=missing_countries if missing_countries else None
+        chat_history=chat_history
     )
-    
+
     return {"chat_history": [response]}

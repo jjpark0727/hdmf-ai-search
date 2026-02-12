@@ -19,14 +19,14 @@ class GraphState(TypedDict):
     # grade document 노드로 검증된 양질의 문서
     final_context: str
 
-    # 재검색이 필요한 국가 리스트 (예: ["usa"], ["japan"] 또는 ["usa", "japan"])
-    needed_search: List[str]
+    # 재검색이 필요한 메타데이터 필터 리스트 (예: [{"file_id": "1"}])
+    needed_search: List[dict]
 
-    # 국가별 재시도 횟수 추적
-    retry_counts: Dict[str, int]
+    # 재시도 횟수 추적 (단일 카운터, 최대 1회 재시도)
+    retry_count: int
 
-    # 업로드된 파일
-    uploaded_files: List[str]  # 예: ["1","2"]
+    # 업로드된 파일 메타데이터
+    uploaded_files: List[dict]  # 예: [{"file_id": "1", "file_name": "report.pdf"}, ...]
 
     # 사용자의 원본 질문
     original_query: str

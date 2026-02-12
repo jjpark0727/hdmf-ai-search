@@ -9,6 +9,7 @@ from langchain_core.runnables import RunnableConfig
 
 from graph import graph, build_graph, visualize_graph
 from config import ensure_directories
+from ingest import load_uploaded_files
 
 
 def run_chat(
@@ -96,7 +97,7 @@ def run_interactive():
     print("=" * 50)
     
     thread_id = "interactive_1"
-    uploaded_files = ["1", "2"]  # 기본 파일 설정
+    uploaded_files = load_uploaded_files()
     
     while True:
         try:
@@ -178,7 +179,7 @@ def test_search_query():
     response = run_chat(
         question="미국과 일본의 6G 기술 개발 전략을 비교해줘",
         thread_id="test_search",
-        uploaded_files=["1", "2"],
+        uploaded_files=load_uploaded_files(),
         verbose=True
     )
     
@@ -194,7 +195,7 @@ def test_summary_query():
     response = run_chat(
         question="1번 문서의 핵심 내용을 요약해줘",
         thread_id="test_summary",
-        uploaded_files=["1", "2"],
+        uploaded_files=load_uploaded_files(),
         verbose=True
     )
     
@@ -210,7 +211,7 @@ def test_direct_answer():
     response = run_chat(
         question="안녕하세요!",
         thread_id="test_direct",
-        uploaded_files=["1", "2"],
+        uploaded_files=load_uploaded_files(),
         verbose=True
     )
     

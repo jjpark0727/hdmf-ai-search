@@ -16,8 +16,6 @@ from .vectorstore import (
 )
 from .retriever import (
     RetrieverFactory,
-    get_japan_retriever,
-    get_usa_retriever,
 )
 from .grader import DocumentGrader, GradeResult
 from .query_transform import QueryTransformer
@@ -40,8 +38,6 @@ __all__ = [
     "add_documents_to_vectorstore",
     # Retriever
     "RetrieverFactory",
-    "get_japan_retriever",
-    "get_usa_retriever",
     # Grader
     "DocumentGrader",
     "GradeResult",

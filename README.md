@@ -1,6 +1,7 @@
-# LangGraph Agentic RAG Project
+# LangGraph Agentic RAG System
 
-LangGraph를 활용한 Agentic RAG (Retrieval-Augmented Generation) 시스템입니다.
+AI서치 시스템(1단계) 구현을 위한 LangGraph 기반 Agentic RAG 시스템 입니다. 
+
 
 ## 📁 프로젝트 구조
 
@@ -10,6 +11,13 @@ langgraph_rag_project/
 ├── model.py               # LLM, 임베딩 모델 설정
 ├── prompt.py              # 모든 프롬프트 템플릿
 ├── state.py               # GraphState 정의
+├── tool.py                # 검색/요약 도구 정의
+├── utils.py               # 유틸리티 함수
+├── node.py                # 그래프 노드 정의
+├── edge.py                # 그래프 엣지/라우팅
+├── graph.py               # 그래프 빌더, 컴파일
+├── main.py                # 메인 실행 함수
+├── ingest.py              # 문서 임베딩 실행 함수
 │
 ├── rag/                   # RAG 모듈 패키지
 │   ├── __init__.py
@@ -27,20 +35,10 @@ langgraph_rag_project/
 │   ├── generate_data.py         # RAGAS 평가 데이터셋 생성 
 │   ├── ragas_dataset_v0.X.csv   # generate_data.py로 생성한 평가 데이터셋   
 │   └── ragas_dataset.xlsx       # Gemini 로 생성한 평가 데이터셋
-│ 
-│
-├── tool.py                # 검색/요약 도구 정의
-├── utils.py               # 유틸리티 함수
-├── node.py                # 그래프 노드 정의
-├── edge.py                # 그래프 엣지/라우팅
-├── graph.py               # 그래프 빌더, 컴파일
-├── main.py                # 메인 실행 함수
-├── ingest.py              # 문서 임베딩 실행 함수
 │
 ├── data/                  # 데이터 디렉토리
 │   ├── pdfs/              # PDF 파일
 │   └── vectorstore/       # 벡터스토어 저장
-│
 │
 ├── docs/                  # 문서 디렉토리
 │   ├── architecture/      # 아키텍처 문서
@@ -82,7 +80,7 @@ OPENAI_API_KEY=your-api-key-here
 ```bash
 # data/pdfs 디렉토리에 PDF 파일 배치
 mkdir -p data/pdfs
-# ict_japan_2024.pdf, ict_usa_2024.pdf 파일 복사
+# 테스트용 샘플 파일: ict_japan_2024.pdf, ict_usa_2024.pdf 
 ```
 
 ### 4. 벡터스토어 초기화 (최초 1회)
@@ -96,7 +94,7 @@ python ingest.py
 ### 5. 실행
 
 ```bash
-# 대화형 모드
+# 대화형 모드 (멀티턴)
 python main.py interactive
 
 # 단일 질문 실행
@@ -168,5 +166,8 @@ START
     - rewrite_question_node : 쿼리 재작성 노드 (실제 로직은 rag/query_transform 담당)
     - retry_retrieve_node : 재검색 의도 파악 노드 
     - generate_answer_node : 답변 생성 노드 (실제 로직은 rag/generator 담당)
-- **rag/*.py**: 실제 비즈니스 로직 담당 (RAG 검색)
+- **edge.py**: 조건부 엣지
+    - route_tools: 사용자 의도 분석 결과에 따라 다음 노드 결정 (analyze_user_intent_node 이후)
+    - route_after_grading: 문서 평가 결과에 따라 다음 노드 결정 (grade_documents_node 이후) 
+- **rag/*.py**: 실제 비즈니스 로직 담당 (RAG 검색용)
 

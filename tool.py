@@ -37,6 +37,13 @@ def search_doc(query: str, filter_metadata: Optional[dict] = None) -> str:
     Returns:
         검색된 문서 내용
     """
+    # filter_metadata 정규화: 모델이 list로 전달하는 경우 방어
+    if isinstance(filter_metadata, list):
+        # [{"file_id": "1"}] → {"file_id": "1"}, [{}] 또는 [] → None
+        filter_metadata = filter_metadata[0] if filter_metadata and filter_metadata[0] else None
+    if isinstance(filter_metadata, dict) and not filter_metadata:
+        filter_metadata = None
+
     retriever = retriever_factory.get_similarity_retriever(filter=filter_metadata)
     docs = retriever.invoke(query)
     return "\n\n".join([doc.page_content for doc in docs])

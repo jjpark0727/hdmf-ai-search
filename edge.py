@@ -13,37 +13,30 @@ from config import MAX_RETRY_COUNT
 # ============================================
 def route_tools(state: GraphState) -> str:
     """
-    사용자 의도 분석 결과에 따라 다음 노드 결정
+    사용자 의도 분석 결과의 텍스트 태그에 따라 다음 노드 결정
 
     Args:
         state: 현재 그래프 상태
 
     Returns:
-        다음 노드 이름 ("retrieve", "summarize", "generate_answer")
+        다음 노드 이름 ("retrieve_decision", "summarize_decision", "generate")
     """
     last_message = state["internal_history"][-1]
-    print(f"[DEBUG] route_tools: last_message type = {type(last_message)}")
-    print(f"[DEBUG] route_tools: hasattr tool_calls = {hasattr(last_message, 'tool_calls')}")
-    if hasattr(last_message, "tool_calls"):
-        print(f"[DEBUG] route_tools: last_message.tool_calls = {last_message.tool_calls}")
+    content = last_message.content if hasattr(last_message, "content") else ""
+    print(f"\n🟡[Edge: route_tools]")
+    print(f"[DEBUG] route_tools: content = {content}")
 
-    # 도구 호출이 있는 경우
-    if hasattr(last_message, "tool_calls") and last_message.tool_calls:
-        tool_name = last_message.tool_calls[0]["name"]
-        print(f"[DEBUG] route_tools: tool_name = {tool_name}")
+    if "[RETRIEVE]" in content:
+        print(f"[DEBUG] route_tools: [RETRIEVE] → retrieve_decision")
+        return "retrieve_decision"
 
-        # 요약 도구인 경우
-        if "summarize" in tool_name:
-            print(f"[DEBUG] route_tools: 요약 도구 → summarize")
-            return "summarize"
+    if "[SUMMARIZE]" in content:
+        print(f"[DEBUG] route_tools: [SUMMARIZE] → summarize_decision")
+        return "summarize_decision"
 
-        # 검색 도구인 경우
-        print(f"[DEBUG] route_tools: 검색 도구 → retrieve")
-        return "retrieve"
-
-    # 도구 호출이 없으면 직접 답변
-    print("[DEBUG] route_tools: tool_calls 없음 → generate_answer")
-    return "generate_answer"
+    # [DIRECT_ANSWER] 또는 기타
+    print(f"[DEBUG] route_tools: [DIRECT_ANSWER] → generate")
+    return "generate"
 
 
 # ============================================
@@ -57,21 +50,44 @@ def route_after_grading(state: GraphState) -> str:
         state: 현재 그래프 상태
 
     Returns:
-        다음 노드 이름 ("generate_answer", "rewrite_question")
+        다음 노드 이름 ("generate", "rewrite_question")
     """
     needed = state.get("needed_search", [])
     retry_count = state.get("retry_count", 0)
 
-    # 부족한 정보가 없으면 답변 생성
+    # 부족한 정보가 없으면 생성 라우팅으로
     if not needed:
-        return "generate_answer"
+        return "generate"
 
-    # 재시도 횟수가 MAX_RETRY_COUNT 이상이면 답변 생성
+    # 재시도 횟수가 MAX_RETRY_COUNT 이상이면 생성 라우팅으로
     if retry_count >= MAX_RETRY_COUNT:
-        return "generate_answer"
+        return "generate"
 
     # 아직 재시도 가능하면 질문 재작성
     return "rewrite_question"
+
+
+# ============================================
+# 조건부 엣지 3: 생성 라우팅 (답변 vs 기획안)
+# ============================================
+def route_to_generation(state: GraphState) -> str:
+    """
+    intent_type에 따라 답변 생성 또는 기획안 생성 노드 결정
+
+    Args:
+        state: 현재 그래프 상태
+
+    Returns:
+        다음 노드 이름 ("answer", "report")
+    """
+    intent_type = state.get("intent_type", "answer")
+    print(f"\n🟡[Edge: route_to_generation]")
+    print(f"[DEBUG] route_to_generation: intent_type = {intent_type}")
+
+    if intent_type == "report":
+        return "report"
+
+    return "answer"
 
 
 # ============================================

@@ -4,6 +4,8 @@ node.py - 모든 노드 정의
 각 노드는 상태 관리만 담당하고, 실제 로직은 RAG 모듈에 위임
 """
 
+import re
+
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
 
@@ -12,11 +14,14 @@ from model import decision_model, grader_model, rewrite_model, response_model
 from prompt import (
     DECISION_INSTRUCTIONS,
     DECISION_TEMPLATE,
+    DECIDE_RETRIEVER_INSTRUCTIONS,
+    DECIDE_RETRIEVER_TEMPLATE,
+    DECIDE_SUMMARY_INSTRUCTIONS,
+    DECIDE_SUMMARY_TEMPLATE,
     RETRY_INSTRUCTIONS,
     RETRY_TEMPLATE,
 )
 from tool import (
-    all_tools,
     retrieve_node_tools,
     summarize_node_tools,
 )
@@ -38,7 +43,8 @@ rag_generator = RAGGenerator(llm=response_model)
 # ============================================
 def analyze_user_intent_node(state: GraphState):
     """
-    사용자 질문의 의도를 분석하여 도구 호출 또는 직접 응답 결정
+    사용자 질문의 의도를 고수준으로 분류 (RETRIEVE / SUMMARIZE / DIRECT_ANSWER)
+    세부 도구 선택은 후속 노드(decide_retriever_tool_node, decide_summary_tool_node)에 위임.
 
     Returns:
         업데이트된 상태 (internal_history, original_query, retry_count 등)
@@ -59,16 +65,18 @@ def analyze_user_intent_node(state: GraphState):
     # 최종 메시지 = [지시사항] + 대화 맥락 + [원본 질문]
     messages = [sys_msg] + chat_history[:-1] + [human_msg]
 
-    # 모델 호출
-    response = (
-        decision_model
-        .bind_tools(all_tools)
-        .invoke(messages)
-    )
+    # 모델 호출 (도구 바인딩 없이 텍스트 태그만 출력)
+    response = decision_model.invoke(messages)
 
-    # 만약 아무 응답도 없는 경우
-    if not response.tool_calls and not response.content:
-        response.content = "[DIRECT_ANSWER]"
+    # 응답이 없는 경우 fallback
+    if not response.content:
+        response.content = "[DIRECT_ANSWER][INTENT:answer]"
+
+    # intent_type 파싱: [INTENT:report] 또는 [INTENT:answer]
+    intent_type = "answer"  # 기본값
+    intent_match = re.search(r"\[INTENT:(report|answer)\]", response.content)
+    if intent_match:
+        intent_type = intent_match.group(1)
 
     return {
         "internal_history": [response],
@@ -76,12 +84,78 @@ def analyze_user_intent_node(state: GraphState):
         "retry_count": 0,
         "final_context": "",
         "needed_search": [],
-        "from_summarize": False
+        "from_summarize": False,
+        "intent_type": intent_type
     }
 
 
 # ============================================
-# 노드 2: 검색 노드 (Tool Node 래퍼)
+# 노드 2-A: 검색 도구 결정
+# ============================================
+def decide_retriever_tool_node(state: GraphState):
+    """
+    어떤 검색 도구를 호출할지 결정하고 tool_calls 생성
+
+    현재는 search_doc_tool만 존재하지만, 추후 추가 예쩡.
+    """
+    chat_history = state.get("chat_history", [])
+    question = state["original_query"]
+
+    # 업로드 파일 메타데이터 동적 주입
+    current_files = state.get("uploaded_files", [])
+    DYNAMIC_INSTRUCTION = DECIDE_RETRIEVER_INSTRUCTIONS + f"\n\n### 현재 세션 업로드 파일 메타데이터: {current_files}"
+
+    sys_msg = SystemMessage(content=DYNAMIC_INSTRUCTION)
+    human_msg = HumanMessage(content=DECIDE_RETRIEVER_TEMPLATE.format(question=question))
+
+    # 최종 메시지 = [지시사항] + 대화 맥락 + [원본 질문]
+    messages = [sys_msg] + chat_history[:-1] + [human_msg]
+
+    # 검색 도구만 바인딩하여 호출
+    response = (
+        decision_model
+        .bind_tools(retrieve_node_tools)
+        .invoke(messages)
+    )
+
+    return {"internal_history": [response]}
+
+
+# ============================================
+# 노드 2-B: 요약 도구 결정
+# ============================================
+def decide_summary_tool_node(state: GraphState):
+    """
+    어떤 요약 도구를 호출할지 결정하고 tool_calls 생성
+
+    4개 도구 중 선택: summarize_text, summarize_doc, summarize_page, summarize_history
+    """
+    chat_history = state.get("chat_history", [])
+    question = state["original_query"]
+
+    # 업로드 파일 메타데이터 동적 주입
+    current_files = state.get("uploaded_files", [])
+    DYNAMIC_INSTRUCTION = DECIDE_SUMMARY_INSTRUCTIONS + f"\n\n### 현재 세션 업로드 파일 메타데이터: {current_files}"
+
+    sys_msg = SystemMessage(content=DYNAMIC_INSTRUCTION)
+    human_msg = HumanMessage(content=DECIDE_SUMMARY_TEMPLATE.format(question=question))
+
+     # 최종 메시지 = [지시사항] + 대화 맥락 + [원본 질문]
+    # 대화 맥락 포함 (summarize_history_tool이 원문 추출에 chat_history 필요)
+    messages = [sys_msg] + chat_history[:-1] + [human_msg]
+
+    # 요약 도구만 바인딩하여 호출
+    response = (
+        decision_model
+        .bind_tools(summarize_node_tools)
+        .invoke(messages)
+    )
+
+    return {"internal_history": [response]}
+
+
+# ============================================
+# 노드 3: 검색 노드 (Tool Node 래퍼)
 # ============================================
 standard_tool_node = ToolNode(retrieve_node_tools)
 
@@ -122,7 +196,7 @@ def summarize_node(state: GraphState):
     return {
         "internal_history": result["messages"],
         "chat_history": [AIMessage(content=summary_text)],
-        "from_summarize": True
+        "from_summarize": True,
     }
 
 
@@ -173,6 +247,9 @@ def grade_documents_node(state: GraphState):
         else:
             # 실패한 검색의 filter_metadata를 needed_search에 추가
             failed_filter = tool_call_filters.get(tool_msg.tool_call_id)
+            # 모델이 filter_metadata를 list로 전달한 경우 정규화
+            if isinstance(failed_filter, list):
+                failed_filter = failed_filter[0] if failed_filter else {}
             needed.append(failed_filter if failed_filter else {})
 
     # final_context: 기존 보존분 + 이번에 통과한 결과
@@ -262,7 +339,22 @@ def retry_retrieve_node(state: GraphState):
 
 
 # ============================================
-# 노드 7: 답변 생성 (상태 관리만)
+# 노드 7: 생성 라우팅 (pass-through)
+# ============================================
+def route_to_generation_node(state: GraphState):
+    """
+    답변/기획안 생성 전 라우팅을 위한 pass-through 노드
+
+    상태를 변경하지 않고 그대로 통과시킨다.
+    이후 조건부 엣지(route_to_generation)에서 intent_type에 따라 분기.
+    """
+    return {
+        "intent_type": state.get("intent_type", "answer"),
+    }
+
+
+# ============================================
+# 노드 8: 답변 생성 (상태 관리만)
 # ============================================
 def generate_answer_node(state: GraphState):
     """
@@ -271,9 +363,11 @@ def generate_answer_node(state: GraphState):
     실제 생성 로직은 RAGGenerator에 위임하고,
     이 노드는 상태 업데이트만 담당
     """
+    import traceback
+
     chat_history = state.get("chat_history", [])
 
-    # 요약 노드에서 온 경우, 바로 종료
+    # 요약 노드에서 온 경우, 이미 chat_history에 요약 결과가 있으므로 바이패스
     if state.get("from_summarize", False):
         return {"from_summarize": False}
 
@@ -281,11 +375,49 @@ def generate_answer_node(state: GraphState):
     question = state["original_query"]
     context = state.get("final_context", "")
 
-    # RAGGenerator에 답변 생성 위임
-    response = rag_generator.generate_with_mode(
-        question=question,
-        context=context if context else None,
-        chat_history=chat_history
-    )
+    try:
+        # RAGGenerator에 답변 생성 위임
+        response = rag_generator.generate_with_mode(
+            question=question,
+            context=context if context else None,
+            chat_history=chat_history
+        )
+        print(f"[DEBUG] generate_answer_node: response type={type(response)}, content type={type(response.content) if response else None}")
+    except Exception as e:
+        print(f"[ERROR] generate_answer_node 에러 발생:")
+        traceback.print_exc()
+        raise
+
+    return {"chat_history": [response]}
+
+
+# ============================================
+# 노드 9: 기획안/보고서 생성 (상태 관리만)
+# ============================================
+import traceback
+def generate_report_node(state: GraphState):
+    """
+    기획안/보고서/제안서 생성 노드
+
+    실제 생성 로직은 RAGGenerator.generate_report에 위임하고,
+    이 노드는 상태 업데이트만 담당
+    """
+    chat_history = state.get("chat_history", [])
+    question = state["original_query"]
+    context = state.get("final_context", "")
+
+    try:
+        # RAGGenerator에 리포트 생성 위임
+        response = rag_generator.generate_report(
+            question=question,
+            context=context if context else None,
+            chat_history=chat_history
+        )
+        print(f"[DEBUG] generate_answer_node: response type={type(response)}, content type={type(response.content) if response else None}")
+    except Exception as e:
+        print(f"[ERROR] generate_report_node 에러 발생:")
+        traceback.print_exc()
+        raise
+
 
     return {"chat_history": [response]}

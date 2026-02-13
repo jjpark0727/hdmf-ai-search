@@ -33,3 +33,6 @@ class GraphState(TypedDict):
 
     # 요약 노드 경유 여부
     from_summarize: bool
+
+    # 최종 출력 형태 ("answer" 또는 "report")
+    intent_type: str

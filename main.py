@@ -54,7 +54,7 @@ def run_chat(
     for chunk in graph.stream(input_data, config=config):
         for node, update in chunk.items():
             if verbose:
-                print(f"\n[Node: {node}]")
+                print(f"\n🟢[Node: {node}]")
             
             # 내부 작업 이력 
             if "internal_history" in update:
@@ -64,24 +64,24 @@ def run_chat(
                         if verbose:
                             print(f"🛠️ 도구 호출: {msg.tool_calls}")
                     
-                    # 텍스트 답변이 있으면 출력 (없는게 정상)
-                    if node == "generate_answer_node":
-                        if verbose:
-                            print(f"💬 최종 답변: {msg.content}")
-                        final_response = msg.content
+                    # # 텍스트 답변이 있으면 출력 (없는게 정상)
+                    # if node in ["generate_answer_node", "generate_report_node"]:
+                    #     if verbose:
+                    #         print(f"💬 최종 답변: {msg.content}")
+                    #     final_response = msg.content
+
                     # 내부 처리 메시지 내용 출력
-                    elif verbose and msg.content:
-                        content_preview = msg.content[:200] + "..." if len(msg.content) > 100 else msg.content
-                        print(f"💬 내부 내용(일부): {content_preview}")
+                    # if verbose and msg.content:
+                    #     content_preview = msg.content[:100] + "..." if len(msg.content) > 100 else msg.content
+                    #     print(f"💬 내부 내용(일부): {content_preview}")
             
             # 최종 대화 이력
             if "chat_history" in update and update["chat_history"]:
                 last_msg = update["chat_history"][-1]
                 if hasattr(last_msg, "content"):
                     final_response = last_msg.content
-                    # summarize_node와 generate_answer_node 모두 출력
-                    if verbose and node in ["generate_answer_node", "summarize_node"]:
-                        print(f"💬 최종 답변: {last_msg.content}")
+                    if verbose and node in ["generate_answer_node", "summarize_node", "generate_report_node"]:
+                        print(f"💬 최종 답변:\n {last_msg.content}")
             
             if verbose and "needed_search" in update:
                 print(f"🔍 부족한 정보: {update['needed_search']}")
@@ -89,15 +89,22 @@ def run_chat(
     return final_response
 
 
-def run_interactive():
-    """대화형 모드 실행"""
+def run_interactive(load_docs: bool = True):
+    """
+    대화형 모드 실행
+
+    Args:
+        load_docs: True이면 업로드된 문서를 불러옴 (interactive_doc),
+                   False이면 문서 없이 채팅만 수행 (interactive_chat)
+    """
+    mode_label = "문서 기반 RAG" if load_docs else "채팅 전용"
     print("=" * 50)
-    print("LangGraph Agentic RAG 시스템")
+    print(f"LangGraph Agentic RAG 시스템 ({mode_label} 모드)")
     print("종료하려면 'quit' 또는 'exit'를 입력하세요")
     print("=" * 50)
-    
+
     thread_id = "interactive_1"
-    uploaded_files = load_uploaded_files()
+    uploaded_files = load_uploaded_files() if load_docs else None
     
     while True:
         try:
@@ -166,56 +173,6 @@ def print_state(thread_id: str = "1"):
     print(f"Next: {snapshot.next}")
 
 
-# ============================================
-# 테스트 함수들
-# ============================================
-
-def test_search_query():
-    """검색 쿼리 테스트"""
-    print("\n" + "=" * 50)
-    print("테스트: 검색 쿼리")
-    print("=" * 50)
-    
-    response = run_chat(
-        question="미국과 일본의 6G 기술 개발 전략을 비교해줘",
-        thread_id="test_search",
-        uploaded_files=load_uploaded_files(),
-        verbose=True
-    )
-    
-    return response
-
-
-def test_summary_query():
-    """요약 쿼리 테스트"""
-    print("\n" + "=" * 50)
-    print("테스트: 요약 쿼리")
-    print("=" * 50)
-    
-    response = run_chat(
-        question="1번 문서의 핵심 내용을 요약해줘",
-        thread_id="test_summary",
-        uploaded_files=load_uploaded_files(),
-        verbose=True
-    )
-    
-    return response
-
-
-def test_direct_answer():
-    """직접 답변 테스트"""
-    print("\n" + "=" * 50)
-    print("테스트: 직접 답변")
-    print("=" * 50)
-    
-    response = run_chat(
-        question="안녕하세요!",
-        thread_id="test_direct",
-        uploaded_files=load_uploaded_files(),
-        verbose=True
-    )
-    
-    return response
 
 
 # ============================================
@@ -231,12 +188,10 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         command = sys.argv[1]
         
-        if command == "interactive":
-            run_interactive()     # 대화형 모드 
-        elif command == "test":
-            test_search_query()   # 검색쿼리 테스트
-            test_summary_query()  # 요약쿼리 테스트
-            test_direct_answer()  # 직접대답 테스트
+        if command == "interactive_doc":
+            run_interactive(load_docs=True)    # 문서 기반 대화형 모드
+        elif command == "interactive_chat":
+            run_interactive(load_docs=False)   # 채팅 전용 대화형 모드
         elif command == "visualize":
             output_path = sys.argv[2] if len(sys.argv) > 2 else "visualize_graph.png"
             visualize_graph(graph, output_path)
@@ -245,5 +200,5 @@ if __name__ == "__main__":
             question = " ".join(sys.argv[1:])
             response = run_chat(question, verbose=True)
     else:
-        # 기본: 대화형 모드
-        run_interactive()
+        # 기본: 문서 기반 대화형 모드
+        run_interactive(load_docs=True)

@@ -19,7 +19,7 @@ def route_tools(state: GraphState) -> str:
         state: 현재 그래프 상태
 
     Returns:
-        다음 노드 이름 ("retrieve_decision", "summarize_decision", "generate")
+        다음 노드 이름 ("retrieve_decision", "summarize_decision", "translate_decision", "generate")
     """
     last_message = state["internal_history"][-1]
     content = last_message.content if hasattr(last_message, "content") else ""
@@ -33,6 +33,10 @@ def route_tools(state: GraphState) -> str:
     if "[SUMMARIZE]" in content:
         print(f"[DEBUG] route_tools: [SUMMARIZE] → summarize_decision")
         return "summarize_decision"
+    
+    if "[TRANSLATE]" in content:
+        print(f"[DEBUG] route_tools: [TRANSLATE] → translate_decision")
+        return "translate_decision"
 
     # [DIRECT_ANSWER] 또는 기타
     print(f"[DEBUG] route_tools: [DIRECT_ANSWER] → generate")

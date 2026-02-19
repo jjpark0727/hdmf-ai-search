@@ -10,8 +10,10 @@ from node import (
     analyze_user_intent_node,
     decide_retriever_tool_node,
     decide_summary_tool_node,
+    decide_translate_tool_node,
     retrieve_node,
     summarize_node,
+    translate_node,
     grade_documents_node,
     rewrite_question_node,
     retry_retrieve_node,
@@ -41,8 +43,10 @@ def build_graph(use_memory: bool = True) -> StateGraph:
     workflow.add_node("analyze_user_intent_node", analyze_user_intent_node)
     workflow.add_node("decide_retriever_tool_node", decide_retriever_tool_node)
     workflow.add_node("decide_summary_tool_node", decide_summary_tool_node)
+    workflow.add_node("decide_translate_tool_node", decide_translate_tool_node)
     workflow.add_node("retrieve_node", retrieve_node)
     workflow.add_node("summarize_node", summarize_node)
+    workflow.add_node("translate_node", translate_node)
     workflow.add_node("grade_documents_node", grade_documents_node)
     workflow.add_node("rewrite_question_node", rewrite_question_node)
     workflow.add_node("retry_retrieve_node", retry_retrieve_node)
@@ -64,6 +68,7 @@ def build_graph(use_memory: bool = True) -> StateGraph:
         {
             "retrieve_decision": "decide_retriever_tool_node",
             "summarize_decision": "decide_summary_tool_node",
+            "translate_decision": "decide_translate_tool_node",
             "generate": "route_to_generation_node",
         },
     )
@@ -75,12 +80,19 @@ def build_graph(use_memory: bool = True) -> StateGraph:
     # (3)-2. 요약 도구 결정 → 요약 실행
     workflow.add_edge("decide_summary_tool_node", "summarize_node")
 
+    # (3)-3. 번역 도구 결정 → 번역 실행
+    workflow.add_edge("decide_translate_tool_node", "translate_node")
+
     # (4) 실행 후 후속 처리
     # (4)-1. 요약 후 생성 라우팅으로 이동
     workflow.add_edge("summarize_node", "route_to_generation_node")
 
     # (4)-2. 검색 후 평가 노드로 이동
     workflow.add_edge("retrieve_node", "grade_documents_node")
+
+    # (4)-3. 번역 후 생성 라우팅으로 이동
+    workflow.add_edge("translate_node", "route_to_generation_node")
+
 
     # (5) 평가 결과에 따라 라우팅 (관련도 판단)
     workflow.add_conditional_edges(

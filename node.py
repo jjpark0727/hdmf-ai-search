@@ -18,12 +18,15 @@ from prompt import (
     DECIDE_RETRIEVER_TEMPLATE,
     DECIDE_SUMMARY_INSTRUCTIONS,
     DECIDE_SUMMARY_TEMPLATE,
+    DECIDE_TRANSLATE_INSTRUCTIONS,
+    DECIDE_TRANSLATE_TEMPLATE, 
     RETRY_INSTRUCTIONS,
     RETRY_TEMPLATE,
 )
 from tool import (
     retrieve_node_tools,
     summarize_node_tools,
+    translate_node_tools,
 )
 from rag.grader import DocumentGrader
 from rag.query_transform import QueryTransformer
@@ -43,8 +46,8 @@ rag_generator = RAGGenerator(llm=response_model)
 # ============================================
 def analyze_user_intent_node(state: GraphState):
     """
-    사용자 질문의 의도를 고수준으로 분류 (RETRIEVE / SUMMARIZE / DIRECT_ANSWER)
-    세부 도구 선택은 후속 노드(decide_retriever_tool_node, decide_summary_tool_node)에 위임.
+    사용자 질문의 의도를 고수준으로 분류 (RETRIEVE / SUMMARIZE / TRANSLATE / DIRECT_ANSWER)
+    세부 도구 선택은 후속 노드(decide_retriever_tool_node, decide_summary_tool_node, decide_translate_tool_node)에 위임.
 
     Returns:
         업데이트된 상태 (internal_history, original_query, retry_count 등)
@@ -96,7 +99,7 @@ def decide_retriever_tool_node(state: GraphState):
     """
     어떤 검색 도구를 호출할지 결정하고 tool_calls 생성
 
-    현재는 search_doc_tool만 존재하지만, 추후 추가 예쩡.
+    현재는 search_doc_tool만 존재하지만, 추후 추가 예정.
     """
     chat_history = state.get("chat_history", [])
     question = state["original_query"]
@@ -155,9 +158,45 @@ def decide_summary_tool_node(state: GraphState):
 
 
 # ============================================
+# 노드 2-C: 번역 도구 결정
+# ============================================
+def decide_translate_tool_node(state: GraphState):
+    """
+    어떤 번역 도구를 호출할지 결정하고 tool_calls 생성
+
+     4개 도구 중 선택: translate_text, translate_doc, translate_page, translate_history
+    """
+    chat_history = state.get("chat_history", [])
+    question = state["original_query"]
+
+    # 업로드 파일 메타데이터 동적 주입
+    current_files = state.get("uploaded_files", [])
+    DYNAMIC_INSTRUCTION = DECIDE_TRANSLATE_INSTRUCTIONS + f"\n\n### 현재 세션 업로드 파일 메타데이터: {current_files}"
+
+    sys_msg = SystemMessage(content=DYNAMIC_INSTRUCTION)
+    human_msg = HumanMessage(content=DECIDE_TRANSLATE_TEMPLATE.format(question=question))
+
+    # 최종 메시지 = [지시사항] + 대화 맥락 + [원본 질문]
+    # 대화 맥락 포함 (translate_history_tool이 원문 추출에 chat_history 필요)
+    messages = [sys_msg] + chat_history[:-1] + [human_msg]
+
+    # 번역 도구만 바인딩하여 호출
+    response = (
+        decision_model
+        .bind_tools(translate_node_tools)
+        .invoke(messages)
+    )
+
+    return {"internal_history": [response]}
+
+
+
+
+
+# ============================================
 # 노드 3: 검색 노드 (Tool Node 래퍼)
 # ============================================
-standard_tool_node = ToolNode(retrieve_node_tools)
+standard_retrieve_tool_node = ToolNode(retrieve_node_tools)
 
 
 def retrieve_node(state: GraphState):
@@ -166,7 +205,7 @@ def retrieve_node(state: GraphState):
 
     ToolNode가 internal_history의 tool_calls를 실행
     """
-    result = standard_tool_node.invoke({
+    result = standard_retrieve_tool_node.invoke({
         "messages": state["internal_history"]
     })
 
@@ -199,9 +238,35 @@ def summarize_node(state: GraphState):
         "from_summarize": True,
     }
 
+# ============================================
+# 노드 4: 번역 노드 (Tool Node 래퍼)
+# ============================================
+standard_translate_tool_node = ToolNode(translate_node_tools)
+
+
+def translate_node(state: GraphState):
+    """
+    번역 도구 실행 노드
+
+    번역 결과를 chat_history에도 추가하여 대화 맥락 유지
+    """
+    result = standard_translate_tool_node.invoke({
+        "messages": state["internal_history"]
+    })
+
+    # 도구 결과(번역문) 추출 - 복수 tool_calls인 경우 모든 결과를 합산
+    tool_messages = [msg for msg in result["messages"] if isinstance(msg, ToolMessage)]
+    translated_text = "\n\n---\n\n".join(msg.content for msg in tool_messages)
+
+    return {
+        "internal_history": result["messages"],
+        "chat_history": [AIMessage(content=translated_text)],
+        "from_summarize": True, # 공용으로 사용
+    }
+
 
 # ============================================
-# 노드 4: 문서 관련도 평가 (개별 tool_call 평가)
+# 노드 5: 문서 관련도 평가 (개별 tool_call 평가)
 # ============================================
 def grade_documents_node(state: GraphState):
     """
@@ -277,7 +342,7 @@ def grade_documents_node(state: GraphState):
 
 
 # ============================================
-# 노드 5: 쿼리 재작성 (상태 관리만)
+# 노드 6: 쿼리 재작성 (상태 관리만)
 # ============================================
 def rewrite_question_node(state: GraphState):
     """
@@ -299,7 +364,7 @@ def rewrite_question_node(state: GraphState):
 
 
 # ============================================
-# 노드 6: 재검색 의도 파악
+# 노드 7: 재검색 의도 파악
 # ============================================
 def retry_retrieve_node(state: GraphState):
     """
@@ -339,7 +404,7 @@ def retry_retrieve_node(state: GraphState):
 
 
 # ============================================
-# 노드 7: 생성 라우팅 (pass-through)
+# 노드 8: 생성 라우팅 (pass-through)
 # ============================================
 def route_to_generation_node(state: GraphState):
     """
@@ -354,7 +419,7 @@ def route_to_generation_node(state: GraphState):
 
 
 # ============================================
-# 노드 8: 답변 생성 (상태 관리만)
+# 노드 9: 답변 생성 (상태 관리만)
 # ============================================
 def generate_answer_node(state: GraphState):
     """
@@ -367,7 +432,7 @@ def generate_answer_node(state: GraphState):
 
     chat_history = state.get("chat_history", [])
 
-    # 요약 노드에서 온 경우, 이미 chat_history에 요약 결과가 있으므로 바이패스
+    # 요약/번역 노드에서 온 경우, 이미 chat_history에 요약 결과가 있으므로 바이패스
     if state.get("from_summarize", False):
         return {"from_summarize": False}
 
@@ -392,7 +457,7 @@ def generate_answer_node(state: GraphState):
 
 
 # ============================================
-# 노드 9: 기획안/보고서 생성 (상태 관리만)
+# 노드 10: 기획안/보고서 생성 (상태 관리만)
 # ============================================
 import traceback
 def generate_report_node(state: GraphState):

@@ -29,13 +29,11 @@ class RAGGenerator:
         """
         self.llm = llm
 
-    def generate(
+    def generate_answer(
         self,
         question: str,
         context: str,
         chat_history: Optional[List] = None,
-        instructions: Optional[str] = None,
-        template: Optional[str] = None
     ) -> AIMessage:
         """
         컨텍스트 기반 RAG 답변 생성
@@ -44,8 +42,6 @@ class RAGGenerator:
             question: 사용자 질문
             context: 검색된 문서 컨텍스트
             chat_history: 이전 대화 기록 (선택)
-            instructions: 커스텀 지시사항 (None이면 기본값 사용)
-            template: 커스텀 템플릿 (None이면 기본값 사용)
 
         Returns:
             AIMessage - 생성된 답변
@@ -75,7 +71,7 @@ class RAGGenerator:
 
         return response
 
-    def generate_direct(
+    def generate_direct_answer(
         self,
         question: str,
         chat_history: Optional[List] = None,
@@ -123,8 +119,8 @@ class RAGGenerator:
 
         Args:
             question: 사용자 질문
-            context: 검색된 문서 컨텍스트 (없으면 직접 답변)
-            chat_history: 이전 대화 기록 (선택)
+            context: 검색된 문서 컨텍스트 
+            chat_history: 이전 대화 기록 
 
         Returns:
             AIMessage - 생성된 답변
@@ -132,14 +128,14 @@ class RAGGenerator:
 
         # 검색 context가 있는 경우
         if context and context.strip():
-            return self.generate(
+            return self.generate_answer(
                 question=question,
                 context=context,
                 chat_history=chat_history
             )
         else:
             # 직접 답변하는 경우
-            return self.generate_direct(
+            return self.generate_direct_answer(
                 question=question,
                 chat_history=chat_history
             )

@@ -55,6 +55,11 @@ class BaseVectorStore(ABC):
         pass
     
     @abstractmethod
+    def get_all_by_filter(self, filter: Dict) -> List[Document]:
+        """필터 조건에 맞는 모든 문서를 페이지/청크 순으로 반환"""
+        pass
+
+    @abstractmethod
     def delete(self, ids: List[str] = None, filter: Dict = None) -> bool:
         """문서 삭제"""
         pass
@@ -120,6 +125,22 @@ class ChromaVectorStore(BaseVectorStore):
             search_kwargs=search_kwargs or {}
         )
     
+    def get_all_by_filter(self, filter: Dict) -> List[Document]:
+        """필터 조건에 맞는 모든 문서를 페이지/청크 순으로 반환"""
+        result = self._store._collection.get(
+            where=filter,
+            include=["documents", "metadatas"]
+        )
+        docs = []
+        for text, meta in zip(result["documents"], result["metadatas"]):
+            docs.append(Document(page_content=text, metadata=meta or {}))
+        # page → chunk 순 정렬 (원문 순서 복원)
+        docs.sort(key=lambda d: (
+            int(d.metadata.get("page", 0)),
+            int(d.metadata.get("chunk", 0))
+        ))
+        return docs
+
     def delete(self, ids: List[str] = None, filter: Dict = None) -> bool:
         """문서 삭제"""
         try:
@@ -130,7 +151,7 @@ class ChromaVectorStore(BaseVectorStore):
         except Exception as e:
             print(f"삭제 중 오류: {e}")
             return False
-    
+
     def get_collection_count(self) -> int:
         """컬렉션 문서 수 반환"""
         return self._store._collection.count()
@@ -261,6 +282,19 @@ class FAISSVectorStore(BaseVectorStore):
             search_kwargs=search_kwargs or {}
         )
     
+    def get_all_by_filter(self, filter: Dict) -> List[Document]:
+        """필터 조건에 맞는 모든 문서를 페이지/청크 순으로 반환 (FAISS 폴백)"""
+        if self._store is None:
+            return []
+        # FAISS는 get() 미지원 → 충분히 큰 k로 전체 검색 후 필터링
+        results = self._store.similarity_search("", k=10000)
+        filtered = self._apply_filter(results, filter, k=len(results))
+        filtered.sort(key=lambda d: (
+            int(d.metadata.get("page", 0)),
+            int(d.metadata.get("chunk", 0))
+        ))
+        return filtered
+
     def delete(self, ids: List[str] = None, filter: Dict = None) -> bool:
         """문서 삭제 (FAISS는 삭제를 잘 지원하지 않음)"""
         print("경고: FAISS는 개별 문서 삭제를 효율적으로 지원하지 않습니다.")
@@ -328,6 +362,15 @@ class PineconeVectorStore(BaseVectorStore):
             search_kwargs=search_kwargs or {}
         )
     
+    def get_all_by_filter(self, filter: Dict) -> List[Document]:
+        """필터 조건에 맞는 모든 문서를 페이지/청크 순으로 반환 (Pinecone 폴백)"""
+        results = self._store.similarity_search("", k=10000, filter=filter)
+        results.sort(key=lambda d: (
+            int(d.metadata.get("page", 0)),
+            int(d.metadata.get("chunk", 0))
+        ))
+        return results
+
     def delete(self, ids: List[str] = None, filter: Dict = None) -> bool:
         try:
             if ids:

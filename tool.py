@@ -8,10 +8,11 @@ from typing import Optional
 from langchain.tools import tool
 from langchain_core.messages import HumanMessage
 
-from model import summary_model
+from model import summary_model, translate_model
 from rag.retriever import RetrieverFactory
 from rag.vectorstore import get_vector_store
 from prompt import SUMMARY_DOC_PROMPT, SUMMARY_TEXT_PROMPT, SUMMARY_PAGE_PROMPT, SUMMARY_HISTORY_PROMPT
+from prompt import TRANSLATE_DOC_PROMPT, TRANSLATE_HISTORY_PROMPT, TRANSLATE_PAGE_PROMPT, TRANSLATE_TEXT_PROMPT
 
 
 # ============================================
@@ -126,7 +127,9 @@ def summarize_history(input_text: str, format_instruction: str = "간결하게 3
 
 
 @tool("summarize_page_tool")
-def summarize_page(file_ids: list[str], pages: list[int], format_instruction: str = "간결하게 3~5줄의 불렛포인트") -> str:
+def summarize_page(file_ids: list[str], 
+                   pages: list[int], 
+                   format_instruction: str = "간결하게 3~5줄의 불렛포인트") -> str:
     """
     업로드된 문서들 중 특정 페이지의 핵심 내용을 요약합니다.
     사용자의 마지막 질문에서 언급된 'file_ids'와 'pages'(페이지 번호 정수 리스트)를 인자로 전달하세요.
@@ -161,12 +164,147 @@ def summarize_page(file_ids: list[str], pages: list[int], format_instruction: st
 
     # 요약 프롬프트 구성
     pages_str = ", ".join(map(str, pages))
-    summary_prompt = SUMMARY_PAGE_PROMPT.format(pages=pages_str, full_text=full_text, format_instruction=format_instruction)
+    summary_prompt = SUMMARY_PAGE_PROMPT.format(pages=pages_str,
+                                                full_text=full_text,
+                                                format_instruction=format_instruction)
 
     # 요약 모델 호출
     response = summary_model.invoke([HumanMessage(content=summary_prompt)])
 
     return response.content
+
+
+
+
+# ============================================
+# 번역 도구 (Translation Tools)
+# ============================================
+
+@tool("translate_doc_tool")
+def translate_doc(file_ids: list[str],
+                  format_instruction: str = "원문 형식 그대로",
+                  language: str = "영어") -> str:
+    """
+    업로드된 특정 문서(들)의 전체 내용을 번역할 때 사용합니다.
+    유저의 질문에서 번역할 문서의 ID를 추출하여, 'file_ids (List[str])'으로 전달하세요.
+    사용자가 출력 양식을 지정한 경우 'format_instruction' 인자로 전달하세요.
+    사용자가 번역할 언어를 지정한 경우 'language' 인자로 전달하세요.
+    반드시 '제공된 문서'의 내용에 기반하여 번역을 수행해야 할 때만 이 도구를 호출하세요.
+    """
+    vector_store = get_vector_store()
+    all_docs_content = []
+
+    for fid in file_ids:
+        # 전체 청크를 페이지/청크 순으로 가져옴 (번역은 원문 전체 필요)
+        docs = vector_store.get_all_by_filter(filter={"file_id": fid})
+
+        content = "\n".join([doc.page_content for doc in docs])
+        if content:
+            all_docs_content.append(f"--- [문서 출처: {fid}번 문서] ---\n{content}")
+
+    full_text = "\n\n".join(all_docs_content)
+
+    if not full_text:
+        return "번역할 수 있는 문서 내용을 찾지 못했습니다. 파일 ID를 확인해주세요."
+
+    # 번역 프롬프트 구성
+    translate_prompt = TRANSLATE_DOC_PROMPT.format(full_text=full_text,
+                                                   format_instruction=format_instruction,
+                                                   language=language)
+
+    # 번역 모델 호출
+    response = translate_model.invoke([HumanMessage(content=translate_prompt)])
+
+    return response.content
+
+
+@tool("translate_text_tool", description="사용자가 직접 입력한 텍스트 본문을 번역합니다.")
+def translate_text(input_text: str,
+                   format_instruction: str = "원문 형식 그대로",
+                   language: str = "영어") -> str:
+    """
+    사용자가 직접 입력하거나 복사하여 붙여넣은 텍스트 본문을 번역합니다.
+    유저의 질문에서 번역 대상이 되는 본문 내용을 추출하여 'input_text' 인자로 전달하세요.
+    사용자가 출력 양식을 지정한 경우 'format_instruction' 인자로 전달하세요.
+    사용자가 번역할 언어를 지정한 경우 'language' 인자로 전달하세요.
+    """
+    # 번역 프롬프트 구성
+    translate_prompt = TRANSLATE_TEXT_PROMPT.format(input_text=input_text, 
+                                                    format_instruction=format_instruction,
+                                                    language = language)
+
+    # 번역 모델 호출
+    response = translate_model.invoke([HumanMessage(content=translate_prompt)])
+
+    return response.content
+
+
+@tool("translate_history_tool", description="이전 대화 내용을 번역합니다. 사용자의 요청에 따라 직전 답변 하나 또는 여러 답변을 합쳐서 번역할 수 있습니다.")
+def translate_history(input_text: str,
+                      format_instruction: str = "원문 형식 그대로",
+                      language: str = "영어") -> str:
+    """
+    이전 대화 내용을 번역합니다.
+    사용자의 요청 의도에 따라, 단일 또는 복수의 AI 답변을 추출하여 'input_text' 인자로 전달하세요.
+    사용자가 출력 양식을 지정한 경우 'format_instruction' 인자로 전달하세요.
+    사용자가 번역할 언어를 지정한 경우 'language' 인자로 전달하세요.
+    """
+    # 번역 프롬프트 구성
+    translate_prompt = TRANSLATE_HISTORY_PROMPT.format(input_text=input_text, 
+                                                       format_instruction=format_instruction,
+                                                        language = language)
+
+    # 번역 모델 호출
+    response = translate_model.invoke([HumanMessage(content=translate_prompt)])
+
+    return response.content
+
+
+@tool("translate_page_tool")
+def translate_page(file_ids: list[str],
+                   pages: list[int],
+                   format_instruction: str = "원문 형식 그대로",
+                   language: str = "영어") -> str:
+    """
+    업로드된 문서들 중 특정 페이지의 핵심 내용을 번역합니다.
+    사용자의 질문에서 언급된 'file_ids'와 'pages'(페이지 번호 정수 리스트)를 인자로 전달하세요.
+    사용자가 출력 양식을 지정한 경우 'format_instruction' 인자로 전달하세요.
+    사용자가 번역할 언어를 지정한 경우 'language' 인자로 전달하세요.
+    """
+    vector_store = get_vector_store()
+    all_docs_content = []
+
+    for fid in file_ids:
+        for pg in pages:
+            # 특정 문서 특정 페이지의 전체 청크를 순서대로 가져옴
+            docs = vector_store.get_all_by_filter(filter={
+                "$and": [
+                    {"file_id": {"$eq": fid}},
+                    {"page": {"$eq": pg}}
+                ]
+            })
+
+            content = "\n".join([doc.page_content for doc in docs])
+            if content:
+                all_docs_content.append(f"--- [문서 ID: {fid}, {pg}페이지] ---\n{content}")
+
+    full_text = "\n\n".join(all_docs_content)
+
+    if not full_text:
+        return "번역할 수 있는 문서 내용을 찾지 못했습니다."
+
+    # 번역 프롬프트 구성
+    pages_str = ", ".join(map(str, pages))
+    translate_prompt = TRANSLATE_PAGE_PROMPT.format(pages=pages_str,
+                                                    full_text=full_text,
+                                                    format_instruction=format_instruction,
+                                                    language=language)
+
+    # 번역 모델 호출
+    response = translate_model.invoke([HumanMessage(content=translate_prompt)])
+
+    return response.content
+
 
 
 # ============================================
@@ -179,5 +317,8 @@ retrieve_node_tools = [search_doc]
 # 요약 전용 툴
 summarize_node_tools = [summarize_text, summarize_doc, summarize_page, summarize_history]
 
+# 번역 전용 툴 
+translate_node_tools = [translate_text, translate_doc, translate_page, translate_history]
+
 # 모든 도구
-all_tools = retrieve_node_tools + summarize_node_tools
+all_tools = retrieve_node_tools + summarize_node_tools + translate_node_tools

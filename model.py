@@ -27,6 +27,7 @@ grader_model = model        # 2. 검색 결과 평가 모델
 rewrite_model = model       # 3. 질문 재생성 모델
 response_model = model      # 4. 답변 생성 모델
 summary_model = model       # 5. 요약 모델
+translate_model = model     # 6. 번역 모델
 
 # ============================================
 # 임베딩 모델 초기화

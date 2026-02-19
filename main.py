@@ -80,7 +80,7 @@ def run_chat(
                 last_msg = update["chat_history"][-1]
                 if hasattr(last_msg, "content"):
                     final_response = last_msg.content
-                    if verbose and node in ["generate_answer_node", "summarize_node", "generate_report_node"]:
+                    if verbose and node in ["summarize_node", "translate_node", "generate_answer_node", "generate_report_node"]:
                         print(f"💬 최종 답변:\n {last_msg.content}")
             
             if verbose and "needed_search" in update:

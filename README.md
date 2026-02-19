@@ -1,94 +1,91 @@
 # LangGraph Agentic RAG System
 
-AI서치 시스템(1단계) 구현을 위한 LangGraph 기반 Agentic RAG 시스템 입니다. 
+LangGraph 기반 Agentic RAG 시스템입니다.
+사용자의 질문 의도를 분석하여 **검색 / 요약 / 번역 / 보고서 작성 / 직접 답변** 경로를 자동으로 선택하고, 멀티턴 대화를 지원합니다.
 
+---
 
 ## 📁 프로젝트 구조
 
 ```
-langgraph_rag_project/
+hdmf-ai-search/
 ├── config.py              # 환경변수, 경로, 상수 설정
-├── model.py               # LLM, 임베딩 모델 설정
+├── model.py               # LLM · 임베딩 모델 설정
 ├── prompt.py              # 모든 프롬프트 템플릿
 ├── state.py               # GraphState 정의
-├── tool.py                # 검색/요약 도구 정의
-├── utils.py               # 유틸리티 함수
+├── tool.py                # 검색 · 요약 · 번역 도구 정의
 ├── node.py                # 그래프 노드 정의
-├── edge.py                # 그래프 엣지/라우팅
-├── graph.py               # 그래프 빌더, 컴파일
-├── main.py                # 메인 실행 함수
-├── ingest.py              # 문서 임베딩 실행 함수
+├── edge.py                # 그래프 조건부 엣지 / 라우팅
+├── graph.py               # 그래프 빌더 및 컴파일
+├── main.py                # 메인 실행 진입점
+├── ingest.py              # 문서 임베딩 실행
+├── utils.py               # 유틸리티 함수
 │
-├── rag/                   # RAG 모듈 패키지
+├── rag/                   # RAG 핵심 모듈 패키지
 │   ├── __init__.py
-│   ├── parser.py          # 문서 로딩, 메타데이터 주입
-│   ├── chunker.py         # 청킹 전략
-│   ├── embedder.py        # 임베딩 관리
-│   ├── vectorstore.py     # 벡터스토어 관리
-│   ├── retriever.py       # 검색기
-│   ├── grader.py          # 문서 관련성 평가
-│   ├── query_transform.py # 쿼리 변환/확장
-│   └── generator.py       # RAG 답변 생성
+│   ├── parser.py          # 문서 로딩 · 메타데이터 주입
+│   ├── chunker.py         # 청킹 전략 (Recursive / Semantic / Token)
+│   ├── embedder.py        # 임베딩 모델 관리
+│   ├── vectorstore.py     # 벡터스토어 관리 (Chroma / FAISS / Pinecone)
+│   ├── retriever.py       # 검색기 (Similarity / MMR / Hybrid)
+│   ├── grader.py          # LLM 기반 문서 관련성 평가
+│   ├── query_transform.py # 쿼리 재작성 / 확장
+│   └── generator.py       # RAG · 직접 답변 · 보고서 생성
 │
-├── RAGAS/                       # RAGAS 평가용 
-│   ├── docs/                    # 평가에 사용할 문서 모음 
-│   ├── generate_data.py         # RAGAS 평가 데이터셋 생성 
-│   ├── ragas_dataset_v0.X.csv   # generate_data.py로 생성한 평가 데이터셋   
-│   └── ragas_dataset.xlsx       # Gemini 로 생성한 평가 데이터셋
+├── RAGAS/                 # RAGAS 평가 모듈
+│   ├── docs/              # 평가용 문서 모음 (DART, 보험개발원 등)
+│   ├── generate_data.py   # RAGAS 평가 데이터셋 생성
+│   ├── ragas_dataset_v0.1.csv
+│   ├── ragas_dataset_v0.2.csv
+│   └── ragas_dataset_gemini.xlsx
 │
 ├── data/                  # 데이터 디렉토리
-│   ├── pdfs/              # PDF 파일
-│   └── vectorstore/       # 벡터스토어 저장
+│   ├── pdfs/              # 입력 PDF 파일
+│   └── vectorstore/       # 벡터스토어 저장 경로
 │
-├── docs/                  # 문서 디렉토리
+├── docs/                  # 문서
 │   ├── architecture/      # 아키텍처 문서
-│   ├── diagram/           # 다이어그램 문서
-│   │
-│   ├── PROJECT_OVERVIEW.md    
-│   └── RAG_EXPERIMENT.md      
+│   ├── diagram/           # 다이어그램
+│   ├── PROJECT_OVERVIEW.md
+│   ├── RAG_EXPERIMENT.md
+│   └── TEST_SCENARIO.md   # 테스트 시나리오 목록
 │
 ├── requirements.txt
 ├── .env.example
 └── README.md
 ```
 
+---
+
 ## 🚀 설치 및 실행
 
 ### 1. 환경 설정
 
 ```bash
-# 가상환경 생성
 python -m venv venv
-source venv/bin/activate  # Windows: .\venv\Scripts\activate
-
-# 패키지 설치
+source venv/bin/activate        # Windows: .\venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
 ### 2. 환경 변수 설정
 
 ```bash
-# .env 파일 생성
 cp .env.example .env
-
-# .env 파일 편집하여 API 키 입력
+# .env 파일에 API 키 입력
 OPENAI_API_KEY=your-api-key-here
 ```
 
 ### 3. PDF 파일 준비
 
 ```bash
-# data/pdfs 디렉토리에 PDF 파일 배치
 mkdir -p data/pdfs
-# 테스트용 샘플 파일: ict_japan_2024.pdf, ict_usa_2024.pdf 
+# data/pdfs 디렉토리에 PDF 파일 배치
 ```
 
 ### 4. 벡터스토어 초기화 (최초 1회)
 
 ```bash
-# 테스트 문서 임베딩
 python ingest.py
-
 ```
 
 ### 5. 실행
@@ -98,7 +95,7 @@ python ingest.py
 python main.py interactive
 
 # 단일 질문 실행
-python main.py "미국과 일본의 6G 기술 개발 전략을 비교해줘"
+python main.py "1번 문서의 핵심 내용을 요약해줘"
 
 # 테스트 실행
 python main.py test
@@ -107,67 +104,175 @@ python main.py test
 python main.py visualize graph.png
 ```
 
-## 📊 그래프 워크플로우
+---
 
-자세한 워크플로우는 docs 폴더를 참고하세요. 
-사용자 의도 (검색/요약/번역/기획안작성/직접답변 등) 별로 노드는 추가될 예정입니다.
+## 📊 그래프 워크플로우
 
 ```
 START
+  ↓
+[analyze_user_intent_node]   ← 사용자 의도 분류 + 출력 형태 결정
+  ↓ [route_tools 조건부 엣지]
   │
-  ▼
-[analyze_user_intent_node] ──┬── retrieve ──► [retrieve_node]
-  │                          │                      │
-  │                          │                      ▼
-  │                          │              [grade_documents_node]
-  │                          │                      │
-  │                          │         ┌────────────┴────────────┐
-  │                          │         │                         │
-  │                          │    (충분)│                    (부족)│
-  │                          │         ▼                         ▼
-  │                          │         │            [rewrite_question_node]
-  │                          │         │                         │
-  │                          │         │                         ▼
-  │                          │         │            [retry_retrieve_node]
-  │                          │         │                         │
-  │                          │         │                         ▼
-  │                          │         │            [retrieve_node] (재검색)
-  │                          │         │
-  │                          └── summarize ──► [summarize_node]
-  │                          │                      │
-  │                          │                      │
-  └── generate_answer ───────┴──────────────────────┘
-                                        │
-                                        ▼
-                            [generate_answer_node]
-                                        │
-                                        ▼
-                                       END
+  ├─[RETRIEVE]──────────────→ [decide_retriever_tool_node]
+  │                                      ↓
+  │                              [retrieve_node]
+  │                                      ↓
+  │                          [grade_documents_node]
+  │                            ↓ [route_after_grading]
+  │                       OK ──┤├── 부족
+  │                       ↓        ↓
+  │                       │   [rewrite_question_node]
+  │                       │        ↓
+  │                       │   [retry_retrieve_node]
+  │                       │        ↓
+  │                       │   [retrieve_node] ←(재검색 루프)
+  │                       ↓
+  ├─[SUMMARIZE]─────────→ [decide_summary_tool_node]
+  │                                ↓
+  │                        [summarize_node] ──────────────┐
+  │                                                       │
+  ├─[TRANSLATE]─────────→ [decide_translate_tool_node]    │
+  │                                ↓                      │
+  │                        [translate_node] ──────────────┤
+  │                                                       │
+  └─[DIRECT_ANSWER]──────────────────────────────────────┤
+                                                          ↓
+                                              [route_to_generation_node]
+                                               ↓ [route_to_generation]
+                                        answer ┤├ report
+                                           ↓        ↓
+                                   [gen_answer] [gen_report]
+                                           ↓        ↓
+                                          END      END
 ```
 
-## 🔧 주요 기능
+### 의도 분류 태그
 
-### RAG 모듈
+| 태그 | 설명 |
+|---|---|
+| `[RETRIEVE]` | 업로드된 문서에서 정보 검색 |
+| `[SUMMARIZE]` | 문서 / 텍스트 / 페이지 / 이전 대화 요약 |
+| `[TRANSLATE]` | 문서 / 텍스트 / 페이지 / 이전 대화 번역 |
+| `[DIRECT_ANSWER]` | 도구 없이 직접 답변 (인사, 후속질문, 사전지식 등) |
+| `[INTENT:answer]` | 출력 형태: 질의 응답 |
+| `[INTENT:report]` | 출력 형태: 보고서 / 기획안 작성 |
 
-- **parser.py**: PDF, DOCX 등 다양한 문서 형식 지원
-- **chunker.py**: Recursive, Semantic, Token 기반 청킹 등 
-- **retriever.py**: Similarity, MMR, Hybrid 검색 등
-- **grader.py**: LLM 기반 문서 관련성 평가
-- **query_transform.py**: Multi-Query, HyDE, Step-back 등 쿼리 변환
-- **generator.py**: RAG/Direct 모드 답변 생성
+---
 
-### 노드/엣지 분리
+## 🔧 주요 구성 요소
 
-- **node.py**: 상태 관리만 담당
-    - analyze_user_intent_node : 사용자 의도 분석 노드
-    - retrieve_node : 검색 노드 (retrieve_node_tools 사용)
-    - summarize_node : 요약 노드 (summarize_node_tools 사용)
-    - grade_documents_node : 문서 관련도 평가 노드 (실제 로직은 rag/DocumentGrader 담당)
-    - rewrite_question_node : 쿼리 재작성 노드 (실제 로직은 rag/query_transform 담당)
-    - retry_retrieve_node : 재검색 의도 파악 노드 
-    - generate_answer_node : 답변 생성 노드 (실제 로직은 rag/generator 담당)
-- **edge.py**: 조건부 엣지
-    - route_tools: 사용자 의도 분석 결과에 따라 다음 노드 결정 (analyze_user_intent_node 이후)
-    - route_after_grading: 문서 평가 결과에 따라 다음 노드 결정 (grade_documents_node 이후) 
-- **rag/*.py**: 실제 비즈니스 로직 담당 (RAG 검색용)
+### 노드 (node.py)
 
+| 노드 | 역할 |
+|---|---|
+| `analyze_user_intent_node` | 사용자 질문을 작업유형 (`[RETRIEVE/SUMMARIZE/TRANSLATE/DIRECT_ANSWER]`) 과 출력형태 (`[INTENT:answer/report]`) 로 분류 |
+| `decide_retriever_tool_node` | `search_doc_tool` 호출 인자 생성 (query, filter_metadata) |
+| `decide_summary_tool_node` | 4개 요약 도구 중 적절한 도구 및 인자 선택 |
+| `decide_translate_tool_node` | 4개 번역 도구 중 적절한 도구 및 인자 선택 |
+| `retrieve_node` | 검색 도구 (`search_doc_tool`) 실행 |
+| `summarize_node` | 요약 도구 실행 후 결과를 `chat_history`에 저장 |
+| `translate_node` | 번역 도구 실행 후 결과를 `chat_history`에 저장 |
+| `grade_documents_node` | 검색 결과의 관련도를 tool_call 단위로 개별 평가 |
+| `rewrite_question_node` | 관련도 부족 시 검색 쿼리 재작성 |
+| `retry_retrieve_node` | 재작성된 쿼리로 재검색 명령 생성 |
+| `route_to_generation_node` | 생성 노드 분기 전 pass-through |
+| `generate_answer_node` | 최종 답변 생성 (검색 기반 답변 OR 검색 없이 답변) |
+| `generate_report_node` | 기획안 / 보고서 / 제안서 생성 |
+
+### 조건부 엣지 (edge.py)
+
+| 엣지 | 분기 기준 |
+|---|---|
+| `route_tools` | `analyze_user_intent_node` 출력 태그 → `decide_retriever_tool_node` or `decide_summary_tool_node` or `decide_translate_tool_node` or `route_to_generation_node`로 분기 |
+| `route_after_grading` | 관련도 평가 결과 + 재시도 횟수 → `route_to_generation_node`or `rewrite_Question_node` 분기 |
+| `route_to_generation` | `intent_type` → `generate_answer_node` or `generate_report_node` 분기 |
+
+### 도구 (tool.py)
+
+**검색 도구**
+
+| 도구 | 설명 |
+|---|---|
+| `search_doc_tool` | 벡터스토어 유사도 검색. `filter_metadata`로 특정 문서 필터링 가능 |
+
+> 검색 도구는 추후 기능에 따라 추가 확장될 수 있습니다. 
+
+**요약 도구**
+
+| 도구 | 설명 |
+|---|---|
+| `summarize_doc_tool` | 업로드 문서 전체 요약 (MMR 검색 후 요약) |
+| `summarize_page_tool` | 특정 페이지 요약 |
+| `summarize_text_tool` | 사용자가 직접 입력한 텍스트 요약 |
+| `summarize_history_tool` | 이전 대화(AI 답변)를 대상으로 요약 |
+
+**번역 도구**
+
+| 도구 | 설명 |
+|---|---|
+| `translate_doc_tool` | 업로드 문서 전체 번역 (전체 청크를 페이지/청크 순으로 가져와 번역) |
+| `translate_page_tool` | 특정 페이지 번역 |
+| `translate_text_tool` | 사용자가 직접 입력한 텍스트 번역 |
+| `translate_history_tool` | 이전 대화(AI 답변)를 대상으로 번역 |
+
+> 번역 도구는 원문을 요약하지 않고 **원문 형식 그대로** 번역합니다.
+
+### LLM 모델 역할 분리 (model.py)
+
+| 역할 | 변수명 | 설명 |
+|---|---|---|
+| 의도 분석 / 도구 결정 | `decision_model` | 사용자 의도 분류 및 tool_calls 생성 |
+| 문서 관련도 평가 | `grader_model` | 검색 결과 관련도 JSON 평가 |
+| 쿼리 재작성 | `rewrite_model` | 부족한 검색어 재생성 |
+| 답변 생성 | `response_model` | RAG / Direct / Report 답변 생성 |
+| 요약 | `summary_model` | 문서 · 텍스트 · 히스토리 요약 |
+| 번역 | `translate_model` | 문서 · 텍스트 · 히스토리 번역 |
+
+> 연재는 변수명만 구분하고 동일한 LLM 모델 사용
+
+### RAG 모듈 (rag/)
+
+| 모듈 | 설명 |
+|---|---|
+| `parser.py` | PDF / DOCX 로딩, 파일 메타데이터(`file_id`, `file_name`, `page`) 주입 |
+| `chunker.py` | Recursive / Semantic / Token 기반 청킹 전략 |
+| `embedder.py` | 임베딩 모델 관리 |
+| `vectorstore.py` | Chroma / FAISS / Pinecone 벡터스토어 팩토리 패턴. `get_all_by_filter()`로 전체 청크 순서대로 조회 가능 |
+| `retriever.py` | Similarity / MMR / Hybrid 검색기 |
+| `grader.py` | LLM 기반 문서 관련도 평가 (`DocumentGrader`) |
+| `query_transform.py` | 재검색을 위한 쿼리 변환 (`QueryTransformer`) |
+| `generator.py` | RAG 답변 / 직접 답변 / 보고서 생성 (`RAGGenerator`) |
+
+### 상태 (state.py)
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `chat_history` | `list` | 사용자-AI 순수 대화 이력 (Human / AI 메시지) |
+| `internal_history` | `list` | 시스템 내부 작업 이력 (tool_calls, tool messages 등) |
+| `final_context` | `str` | 관련도 평가를 통과한 검색 결과 누적 |
+| `needed_search` | `List[dict]` | 재검색이 필요한 메타데이터 필터 목록 |
+| `retry_count` | `int` | 재검색 시도 횟수 |
+| `uploaded_files` | `List[dict]` | 현재 세션 업로드 파일 메타데이터 |
+| `original_query` | `str` | 현재 턴 사용자 원본 질문 |
+| `from_summarize` | `bool` | 요약/번역 노드 경유 여부 (generate_answer bypass 플래그) |
+| `intent_type` | `str` | 출력 형태 (`"answer"` or `"report"`) |
+
+---
+
+## 📋 테스트 시나리오
+
+지원 시나리오 목록은 [docs/TEST_SCENARIO.md](docs/TEST_SCENARIO.md)를 참고하세요.
+
+**단일 턴으로 처리 가능한 주요 케이스:**
+- 문서 검색 및 질의 응답
+- 단일/다중 문서 요약 · 페이지 요약 · 텍스트 요약
+- 단일/다중 문서 번역 · 페이지 번역 · 텍스트 번역
+- 검색 결과 기반 보고서 / 기획안 작성
+- 요약 결과 기반 보고서 / 기획안 작성
+
+**멀티턴으로 처리하는 케이스:**
+- 검색 → 요약 / 번역 / 보고서
+- 요약 → 번역 / 보고서
+- 번역 → 요약 / 보고서
+- 검색 → 요약 → 번역 (3턴)

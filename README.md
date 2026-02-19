@@ -91,14 +91,14 @@ python ingest.py
 ### 5. 실행
 
 ```bash
-# 대화형 모드 (멀티턴)
-python main.py interactive
+# 대화형 모드 (멀티턴) w/ 문서 참조 없음
+python main.py interactive_chat
 
-# 단일 질문 실행
+# 대화형 모드 (멀티턴) w/ 문서 참조
+python main.py interactive_doc
+
+# 직접 질문 실행 (단일턴)
 python main.py "1번 문서의 핵심 내용을 요약해줘"
-
-# 테스트 실행
-python main.py test
 
 # 그래프 시각화
 python main.py visualize graph.png
@@ -111,7 +111,7 @@ python main.py visualize graph.png
 ```
 START
   ↓
-[analyze_user_intent_node]   ← 사용자 의도 분류 + 출력 형태 결정
+[analyze_user_intent_node]   ← 사용자 의도 분류 (RETRIEVE | SUMMARIZE | TRANSLATE | DIRECT_ANSWER) + 출력 형태 (answer | report) 결정
   ↓ [route_tools 조건부 엣지]
   │
   ├─[RETRIEVE]──────────────→ [decide_retriever_tool_node]
@@ -119,27 +119,27 @@ START
   │                              [retrieve_node]
   │                                      ↓
   │                          [grade_documents_node]
-  │                            ↓ [route_after_grading]
-  │                       OK ──┤├── 부족
-  │                       ↓        ↓
-  │                       │   [rewrite_question_node]
-  │                       │        ↓
-  │                       │   [retry_retrieve_node]
-  │                       │        ↓
-  │                       │   [retrieve_node] ←(재검색 루프)
-  │                       ↓
-  ├─[SUMMARIZE]─────────→ [decide_summary_tool_node]
-  │                                ↓
-  │                        [summarize_node] ──────────────┐
-  │                                                       │
-  ├─[TRANSLATE]─────────→ [decide_translate_tool_node]    │
-  │                                ↓                      │
-  │                        [translate_node] ──────────────┤
-  │                                                       │
-  └─[DIRECT_ANSWER]──────────────────────────────────────┤
-                                                          ↓
+  │                             [route_after_grading 조건부 엣지]
+  │                               부족 ────┤├──────────────── OK 
+  │                               ↓                            ↓
+  │                          [rewrite_question_node]           │
+  │                               ↓                            │
+  │                          [retry_retrieve_node]             │
+  │                              ↓                             │
+  │                          [retrieve_node]                   │
+  │                                                            │
+  ├─[SUMMARIZE]─────────→ [decide_summary_tool_node]           │
+  │                                ↓                           │
+  │                        [summarize_node] ──────────────┐    │
+  │                                                       │    │
+  ├─[TRANSLATE]─────────→ [decide_translate_tool_node]    │    │
+  │                                ↓                      │    │
+  │                        [translate_node] ──────────────│    │
+  │                                                       │    │
+  └─[DIRECT_ANSWER]───────────────────────────────────────│    │
+                                                          ↓    ↓  
                                               [route_to_generation_node]
-                                               ↓ [route_to_generation]
+                                               ↓ [route_to_generation 조건부 엣지]
                                         answer ┤├ report
                                            ↓        ↓
                                    [gen_answer] [gen_report]

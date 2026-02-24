@@ -235,6 +235,7 @@ def summarize_node(state: GraphState):
     return {
         "internal_history": result["messages"],
         "chat_history": [AIMessage(content=summary_text)],
+        "final_context": summary_text,
         "from_summarize": True,
     }
 
@@ -261,6 +262,7 @@ def translate_node(state: GraphState):
     return {
         "internal_history": result["messages"],
         "chat_history": [AIMessage(content=translated_text)],
+        "final_context": translated_text,
         "from_summarize": True, # 공용으로 사용
     }
 

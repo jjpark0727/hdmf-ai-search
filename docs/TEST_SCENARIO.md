@@ -1,7 +1,6 @@
 # 테스트 시나리오 목록
 
-> 현재 graph 구조 기준 (단일 action per turn)
-> 컬럼: 시나리오 | 분류 | 단일턴 여부 | 흐름 요약
+> 현재 graph 구조 테스트 가능한 시나리오
 
 ---
 
@@ -94,6 +93,9 @@
 | "안녕" (대화 기록 없음, 첫 턴) | DIRECT_ANSWER + answer (cold start) | ✅ | chat_history 없이 gen_answer |
 | T1: "문서 검색해줘" → T2: "1번 문서에서 찾아줘" (문서 범위 좁히기) | RETRIEVE → RETRIEVE(필터 추가) | ❌ 2턴 | T2: RETRIEVE, `filter={"file_id":"1"}` (chat_history 맥락 반영) |
 | "이전 대화 전체 요약해줘" (여러 AI 답변 합산) | SUMMARIZE(history, 복수) | ✅ (멀티턴 이후) | `summarize_history_tool(input_text=여러 AI 답변 합산)` → gen_answer(bypass) |
+
+## 8. 멀티턴 불가 시나리오
+
 
 ---
 

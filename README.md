@@ -170,21 +170,37 @@ START
 
 ### 노드 (node.py)
 
-| 노드 | 역할 | 진입 조건 | 입력 state | 업데이트 state |
-|---|---|---|---|---|
-| `analyze_user_intent_node` | 사용자 질문을 작업유형 (`[RETRIEVE/SUMMARIZE/TRANSLATE/DIRECT_ANSWER]`) 과 출력형태 (`[INTENT:answer/report]`) 로 분류 | START 직후 항상 실행 | `chat_history`, `uploaded_files` | `internal_history`, `original_query`, `intent_type`, `retry_count`=0, `final_context`="", `needed_search`=[], `from_summarize`=False |
-| `decide_retriever_tool_node` | `search_doc_tool` 호출 인자 생성 (query, filter_metadata) | `[RETRIEVE]` 분류 시 | `chat_history`, `original_query`, `uploaded_files` | `internal_history` |
-| `decide_summary_tool_node` | 4개 요약 도구 중 적절한 도구 및 인자 선택 | `[SUMMARIZE]` 분류 시 | `chat_history`, `original_query`, `uploaded_files` | `internal_history` |
-| `decide_translate_tool_node` | 4개 번역 도구 중 적절한 도구 및 인자 선택 | `[TRANSLATE]` 분류 시 | `chat_history`, `original_query`, `uploaded_files` | `internal_history` |
-| `retrieve_node` | 검색 도구 (`search_doc_tool`) 실행 | `decide_retriever_tool_node` 이후 / `retry_retrieve_node` 이후 | `internal_history` | `internal_history` |
-| `summarize_node` | 요약 도구 실행 후 결과를 `chat_history` · `final_context`에 저장 | `decide_summary_tool_node` 이후 | `internal_history` | `internal_history`, `chat_history`, `final_context`, `from_summarize`=True |
-| `translate_node` | 번역 도구 실행 후 결과를 `chat_history` · `final_context`에 저장 | `decide_translate_tool_node` 이후 | `internal_history` | `internal_history`, `chat_history`, `final_context`, `from_summarize`=True |
-| `grade_documents_node` | 검색 결과의 관련도를 tool_call 단위로 개별 평가 | `retrieve_node` 이후 | `internal_history`, `original_query`, `retry_count`, `final_context` | `needed_search`, `final_context`, `retry_count` |
-| `rewrite_question_node` | 관련도 부족 시 검색 쿼리 재작성 | `needed_search` 있고 `retry_count` < 2 | `original_query`, `needed_search` | `internal_history` |
-| `retry_retrieve_node` | 재작성된 쿼리로 재검색 명령 생성 | `rewrite_question_node` 이후 | `internal_history`, `needed_search` | `internal_history` |
-| `route_to_generation_node` | 생성 노드 분기 전 pass-through | 요약/번역 완료 후 / 검색 평가 통과 후 / `[DIRECT_ANSWER]` 분류 시 | `intent_type` | `intent_type` (변경 없음) |
-| `generate_answer_node` | 최종 답변 생성. `from_summarize=True`이면 bypass (요약/번역 결과를 그대로 사용) | `intent_type`=`"answer"` | `chat_history`, `original_query`, `final_context`, `from_summarize` | bypass 시: `from_summarize`=False / 생성 시: `chat_history` |
-| `generate_report_node` | 기획안 / 보고서 / 제안서 생성 (`final_context`를 context로 활용) | `intent_type`=`"report"` | `chat_history`, `original_query`, `final_context` | `chat_history` |
+| 노드 | 역할 |
+|---|---|
+| `analyze_user_intent_node` | 사용자 질문을 작업유형 (`[RETRIEVE/SUMMARIZE/TRANSLATE/DIRECT_ANSWER]`) 과 출력형태 (`[INTENT:answer/report]`) 로 분류 |
+| `decide_retriever_tool_node` | `search_doc_tool` 호출 인자 생성 (query, filter_metadata) |
+| `decide_summary_tool_node` | 4개 요약 도구 중 적절한 도구 및 인자 선택 |
+| `decide_translate_tool_node` | 4개 번역 도구 중 적절한 도구 및 인자 선택 |
+| `retrieve_node` | 검색 도구 (`search_doc_tool`) 실행 |
+| `summarize_node` | 요약 도구 실행 후 결과를 `chat_history` · `final_context`에 저장 |
+| `translate_node` | 번역 도구 실행 후 결과를 `chat_history` · `final_context`에 저장 |
+| `grade_documents_node` | 검색 결과의 관련도를 tool_call 단위로 개별 평가 |
+| `rewrite_question_node` | 관련도 부족 시 검색 쿼리 재작성 |
+| `retry_retrieve_node` | 재작성된 쿼리로 재검색 명령 생성 |
+| `route_to_generation_node` | 생성 노드 분기 전 pass-through |
+| `generate_answer_node` | 최종 답변 생성. `from_summarize=True`이면 bypass (요약/번역 결과를 그대로 사용) |
+| `generate_report_node` | 기획안 / 보고서 / 제안서 생성 (`final_context`를 context로 활용) |
+
+| 노드 | 진입 조건 | 입력 state | 업데이트 state |
+|---|---|---|---|
+| `analyze_user_intent_node` | START 직후 항상 실행 | `chat_history`, `uploaded_files` | `internal_history`, `original_query`, `intent_type`, `retry_count`=0, `final_context`="", `needed_search`=[], `from_summarize`=False |
+| `decide_retriever_tool_node` | `[RETRIEVE]` 분류 시 | `chat_history`, `original_query`, `uploaded_files` | `internal_history` |
+| `decide_summary_tool_node` | `[SUMMARIZE]` 분류 시 | `chat_history`, `original_query`, `uploaded_files` | `internal_history` |
+| `decide_translate_tool_node` | `[TRANSLATE]` 분류 시 | `chat_history`, `original_query`, `uploaded_files` | `internal_history` |
+| `retrieve_node` | `decide_retriever_tool_node` 이후 / `retry_retrieve_node` 이후 | `internal_history` | `internal_history` |
+| `summarize_node` | `decide_summary_tool_node` 이후 | `internal_history` | `internal_history`, `chat_history`, `final_context`, `from_summarize`=True |
+| `translate_node` | `decide_translate_tool_node` 이후 | `internal_history` | `internal_history`, `chat_history`, `final_context`, `from_summarize`=True |
+| `grade_documents_node` | `retrieve_node` 이후 | `internal_history`, `original_query`, `retry_count`, `final_context` | `needed_search`, `final_context`, `retry_count` |
+| `rewrite_question_node` | `needed_search` 있고 `retry_count` < 2 | `original_query`, `needed_search` | `internal_history` |
+| `retry_retrieve_node` | `rewrite_question_node` 이후 | `internal_history`, `needed_search` | `internal_history` |
+| `route_to_generation_node` | 요약/번역 완료 후 / 검색 평가 통과 후 / `[DIRECT_ANSWER]` 분류 시 | `intent_type` | `intent_type` (변경 없음) |
+| `generate_answer_node` | `intent_type`=`"answer"` | `chat_history`, `original_query`, `final_context`, `from_summarize` | bypass 시: `from_summarize`=False / 생성 시: `chat_history` |
+| `generate_report_node` | `intent_type`=`"report"` | `chat_history`, `original_query`, `final_context` | `chat_history` |
 
 ### 조건부 엣지 (edge.py)
 

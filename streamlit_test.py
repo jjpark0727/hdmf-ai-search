@@ -6,7 +6,9 @@ streamlit_test.py - Streamlit 웹 인터페이스
   - interactive_chat : 파일 없이 바로 질문 (채팅 전용)
 """
 
+import os
 import sys
+import time
 import streamlit as st
 from pathlib import Path
 
@@ -31,6 +33,7 @@ def init_session():
         "embedded":      False,
         "thread_id":     "streamlit_1",
         "input_counter": 0,      # 입력창 초기화용 키 카운터
+        "shutdown":      False,
     }
     for key, val in defaults.items():
         if key not in st.session_state:
@@ -65,10 +68,14 @@ def main():
     with quit_col:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("종료", key="quit_btn", use_container_width=True):
-            st.session_state.messages = []
-            st.session_state.embedded = False
-            st.info("프로그램을 종료합니다.")
-            st.stop()
+            st.session_state.shutdown = True
+            st.rerun()
+
+    # ── 종료 처리 ─────────────────────────────────
+    if st.session_state.shutdown:
+        st.info("프로그램을 종료합니다.")
+        time.sleep(1)
+        os._exit(0)
 
     # ── 채팅 메시지 영역 ─────────────────────────
     chat_area = st.container(height=480)
@@ -103,7 +110,7 @@ def main():
     with embed_col:
         if st.button(
             "임베딩",
-            disabled=not has_files,
+            disabled=not has_files or st.session_state.embedded,
             type="primary",
             key="embed_btn",
             use_container_width=True,

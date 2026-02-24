@@ -16,7 +16,7 @@ def run_chat(
     question: str,
     thread_id: str = "1",
     uploaded_files: list = None,
-    recursion_limit: int = 10,
+    recursion_limit: int = 15,
     verbose: bool = True
 ):
     """

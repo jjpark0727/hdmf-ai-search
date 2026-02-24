@@ -13,7 +13,22 @@ from config import (
 )
 
 # API 키 환경변수 설정
-os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
+# config에서 못 읽은 경우 st.secrets에서 직접 재시도 (Streamlit Cloud 대응)
+_api_key = OPENAI_API_KEY
+if not _api_key:
+    try:
+        import streamlit as st
+        _api_key = st.secrets.get("OPENAI_API_KEY")
+    except Exception:
+        pass
+
+if not _api_key:
+    raise EnvironmentError(
+        "OPENAI_API_KEY가 설정되지 않았습니다. "
+        "로컬: .env 파일, Streamlit Cloud: Secrets 대시보드를 확인하세요."
+    )
+
+os.environ["OPENAI_API_KEY"] = _api_key
 
 # ============================================
 # LLM 모델 초기화

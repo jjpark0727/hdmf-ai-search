@@ -9,16 +9,29 @@ from dotenv import load_dotenv
 # .env 파일 로드
 load_dotenv()
 
+
+def _get_secret(key: str):
+    """환경변수(.env) → Streamlit Secrets 순서로 값을 읽음"""
+    val = os.getenv(key)
+    if val:
+        return val
+    try:
+        import streamlit as st
+        return st.secrets.get(key)
+    except Exception:
+        return None
+
+
 # ============================================
 # API Keys
 # ============================================
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = _get_secret("OPENAI_API_KEY")
 
 # LangSmith
-LANGCHAIN_TRACING_V2 = os.getenv("LANGCHAIN_TRACING_V2")
-LANGCHAIN_ENDPOINT = os.getenv("LANGCHAIN_ENDPOINT")
-LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT")
-LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY")
+LANGCHAIN_TRACING_V2 = _get_secret("LANGCHAIN_TRACING_V2")
+LANGCHAIN_ENDPOINT = _get_secret("LANGCHAIN_ENDPOINT")
+LANGCHAIN_PROJECT = _get_secret("LANGCHAIN_PROJECT")
+LANGCHAIN_API_KEY = _get_secret("LANGCHAIN_API_KEY")
 
 # ============================================
 # 경로 설정

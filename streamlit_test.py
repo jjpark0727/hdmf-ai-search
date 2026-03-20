@@ -47,16 +47,19 @@ def save_pdfs_to_dir(uploaded_files: list):
     for uf in uploaded_files:
         (PDF_DIR / uf.name).write_bytes(uf.getbuffer())
 
-
 def reset_all():
     """tmp 파일 + 세션 상태 완전 초기화"""
+    # ✅ 벡터스토어 싱글톤 초기화
+    from rag.vectorstore import VectorStoreFactory
+    VectorStoreFactory.clear_instances()
+    
     # 1. /tmp PDF 및 벡터스토어 삭제
     try:
         if PDF_DIR.exists():
             shutil.rmtree(PDF_DIR)
         if VECTORSTORE_DIR.exists():
             shutil.rmtree(VECTORSTORE_DIR)
-        ensure_directories()  # 빈 폴더 재생성
+        ensure_directories()
     except Exception as e:
         st.warning(f"파일 삭제 중 오류: {e}")
 

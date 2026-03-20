@@ -30,10 +30,15 @@ class RetrieverFactory:
 
     @property
     def vector_store(self) -> BaseVectorStore:
-        """벡터스토어 인스턴스 (지연 로딩)"""
-        if self._vector_store is None:
-            self._vector_store = get_vector_store()
-        return self._vector_store
+        """벡터스토어 인스턴스 반환
+
+        명시적으로 주입된 경우 그것을 사용하고,
+        아니면 항상 get_vector_store()를 호출해 최신 인스턴스를 반환한다.
+        (캐시하면 초기화 후 삭제된 컬렉션을 계속 참조하는 버그 발생)
+        """
+        if self._vector_store is not None:
+            return self._vector_store
+        return get_vector_store()
 
     def get_similarity_retriever(
         self,

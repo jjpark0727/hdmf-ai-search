@@ -39,10 +39,26 @@ LANGCHAIN_API_KEY = _get_secret("LANGCHAIN_API_KEY")
 # 프로젝트 루트 디렉토리
 PROJECT_ROOT = Path(__file__).parent
 
+# Streamlit Cloud 환경 감지
+IS_CLOUD = Path("/mount/src").exists()
+
+if IS_CLOUD:
+    # Streamlit Cloud: /tmp 사용 (휘발성이지만 GitHub repo와 분리)
+    BASE_DIR = Path("/tmp/hdmf-ai-search")
+else:
+    # 로컬: 프로젝트 루트 사용
+    BASE_DIR = PROJECT_ROOT
+
 # 데이터 경로
-DATA_DIR = PROJECT_ROOT / "data"
-PDF_DIR = DATA_DIR / "pdfs"
-VECTORSTORE_DIR = DATA_DIR / "vectorstore"
+DATA_DIR        = BASE_DIR / "data"
+PDF_DIR         = BASE_DIR / "data" / "pdfs"
+VECTORSTORE_DIR = BASE_DIR / "data" / "vectorstore"
+
+
+# # 데이터 경로
+# DATA_DIR = PROJECT_ROOT / "data"
+# PDF_DIR = DATA_DIR / "pdfs"
+# VECTORSTORE_DIR = DATA_DIR / "vectorstore"
 
 # PDF 파일 경로 (업로드된 파일 리스트로 동적 관리)
 PDF_FILES = []

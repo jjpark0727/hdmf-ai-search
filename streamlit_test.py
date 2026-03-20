@@ -16,7 +16,7 @@ project_root = Path(__file__).parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from config import PDF_DIR, VECTORSTORE_DIR, ensure_directories
+from config import PDF_DIR, ensure_directories
 from ingest import ingest_documents, load_uploaded_files
 from main import run_chat
 
@@ -49,21 +49,31 @@ def save_pdfs_to_dir(uploaded_files: list):
 
 def reset_all():
     """tmp 파일 + 세션 상태 완전 초기화"""
-    # ✅ 벡터스토어 싱글톤 초기화
-    from rag.vectorstore import VectorStoreFactory
+    from rag.vectorstore import VectorStoreFactory, get_vector_store
+
+    # 1. Chroma 컬렉션을 API로 삭제 (SQLite 파일은 유지)
+    #    → 파일시스템에서 직접 삭제하면 Rust SQLite 커넥션이 DBMOVED 에러를 냄
+    try:
+        vs = get_vector_store()
+        if hasattr(vs, '_store'):
+            chroma_store = vs._store
+            if hasattr(chroma_store, '_client') and hasattr(chroma_store, '_collection'):
+                chroma_store._client.delete_collection(chroma_store._collection.name)
+    except Exception:
+        pass
+
+    # 2. Python 싱글톤 초기화 (_vector_store 글로벌 포함)
     VectorStoreFactory.clear_instances()
-    
-    # 1. /tmp PDF 및 벡터스토어 삭제
+
+    # 3. PDF 파일만 삭제 (vectorstore 디렉토리는 유지 — SQLite 파일 충돌 방지)
     try:
         if PDF_DIR.exists():
             shutil.rmtree(PDF_DIR)
-        if VECTORSTORE_DIR.exists():
-            shutil.rmtree(VECTORSTORE_DIR)
         ensure_directories()
     except Exception as e:
         st.warning(f"파일 삭제 중 오류: {e}")
 
-    # 2. 세션 상태 전체 초기화
+    # 4. 세션 상태 전체 초기화
     for key in list(st.session_state.keys()):
         del st.session_state[key]
 

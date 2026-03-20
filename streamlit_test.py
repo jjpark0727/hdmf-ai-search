@@ -6,9 +6,8 @@ streamlit_test.py - Streamlit 웹 인터페이스
   - interactive_chat : 파일 없이 바로 질문 (채팅 전용)
 """
 
-import os
 import sys
-import time
+import shutil
 import streamlit as st
 from pathlib import Path
 
@@ -17,7 +16,7 @@ project_root = Path(__file__).parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from config import PDF_DIR, ensure_directories
+from config import PDF_DIR, VECTORSTORE_DIR, ensure_directories
 from ingest import ingest_documents, load_uploaded_files
 from main import run_chat
 
@@ -32,7 +31,7 @@ def init_session():
         "messages":      [],
         "embedded":      False,
         "thread_id":     "streamlit_1",
-        "input_counter": 0,      # 입력창 초기화용 키 카운터
+        "input_counter": 0,
         "shutdown":      False,
     }
     for key, val in defaults.items():
@@ -49,6 +48,23 @@ def save_pdfs_to_dir(uploaded_files: list):
         (PDF_DIR / uf.name).write_bytes(uf.getbuffer())
 
 
+def reset_all():
+    """tmp 파일 + 세션 상태 완전 초기화"""
+    # 1. /tmp PDF 및 벡터스토어 삭제
+    try:
+        if PDF_DIR.exists():
+            shutil.rmtree(PDF_DIR)
+        if VECTORSTORE_DIR.exists():
+            shutil.rmtree(VECTORSTORE_DIR)
+        ensure_directories()  # 빈 폴더 재생성
+    except Exception as e:
+        st.warning(f"파일 삭제 중 오류: {e}")
+
+    # 2. 세션 상태 전체 초기화
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+
+
 # ─────────────────────────────────────────────
 # 메인 화면
 # ─────────────────────────────────────────────
@@ -61,21 +77,21 @@ def main():
     )
     init_session()
 
-    # ── 헤더 (제목 + 종료 버튼) ──────────────────
+    # ── 헤더 (제목 + 초기화 버튼) ──────────────────
     title_col, quit_col = st.columns([11, 1])
     with title_col:
         st.title("HDMF AI Search")
     with quit_col:
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("종료", key="quit_btn", use_container_width=True):
+        if st.button("초기화", key="quit_btn", use_container_width=True):
             st.session_state.shutdown = True
             st.rerun()
 
-    # ── 종료 처리 ─────────────────────────────────
+    # ── 초기화 처리 ───────────────────────────────
     if st.session_state.shutdown:
-        st.info("프로그램을 종료합니다.")
-        time.sleep(1)
-        os._exit(0)
+        reset_all()
+        st.success("✅ 초기화 완료! 새 문서를 업로드하세요.")
+        st.stop()
 
     # ── 채팅 메시지 영역 ─────────────────────────
     chat_area = st.container(height=480)
@@ -117,8 +133,11 @@ def main():
         ):
             save_pdfs_to_dir(uploaded)
             with st.spinner("문서 임베딩 중... 잠시 기다려 주세요."):
-                ingest_documents()
-            st.session_state.embedded = True
+                try:
+                    ingest_documents()
+                    st.session_state.embedded = True
+                except ValueError as e:
+                    st.error(f"❗ 문서 처리 실패: {e}")
             st.rerun()
 
     # ── 모드 상태 표시 ───────────────────────────
@@ -135,9 +154,6 @@ def main():
     st.divider()
 
     # ── 입력 영역 ────────────────────────────────
-    # Send 버튼 활성화 조건:
-    #   interactive_doc  → 임베딩 완료 후 텍스트 입력 시
-    #   interactive_chat → 텍스트 입력 시 (파일 없음)
     send_enabled = mode is not None
 
     input_key = f"user_input_{st.session_state.input_counter}"
@@ -163,7 +179,6 @@ def main():
 
     # ── Send 처리 ────────────────────────────────
     if send_clicked and user_input and mode:
-        # 사용자 메시지 기록
         st.session_state.messages.append({"role": "user", "content": user_input})
 
         with st.spinner("응답 생성 중..."):
@@ -191,7 +206,6 @@ def main():
                 st.error(assistant_msg)
 
         st.session_state.messages.append({"role": "assistant", "content": assistant_msg})
-        # 입력창 초기화 (key 변경으로 위젯 리셋)
         st.session_state.input_counter += 1
         st.rerun()
 

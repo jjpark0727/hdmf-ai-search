@@ -13,6 +13,19 @@ from config import PDF_DIR, DATA_DIR
 # 임베딩된 파일 메타데이터 저장 경로
 UPLOADED_FILES_PATH = DATA_DIR / "uploaded_files.json"
 
+from rag.vectorstore import get_vector_store, VectorStoreFactory
+
+def ingest_documents():
+    """PDF_DIR 내 모든 PDF를 벡터스토어에 임베딩"""
+    
+    # ✅ 싱글톤 캐시 초기화 (이전 인스턴스 제거)
+    VectorStoreFactory.clear_instances()
+    
+    # 1. PDF 파일 목록 수집
+    pdf_files = sorted(PDF_DIR.glob("*.pdf"))
+    if not pdf_files:
+        print(f"PDF 파일이 없습니다: {PDF_DIR}")
+        return
 
 def ingest_documents():
     """PDF_DIR 내 모든 PDF를 벡터스토어에 임베딩"""

@@ -443,6 +443,9 @@ class VectorStoreFactory:
     def clear_instances(cls):
         """모든 캐시된 인스턴스 제거"""
         cls._instances.clear()
+        # 모듈 레벨 글로벌 싱글톤도 초기화
+        global _vector_store
+        _vector_store = None
 
 
 # ============================================
